@@ -1,9 +1,10 @@
 from NeuralWake import *
 warnings.filterwarnings("ignore")
 
-# Load model
-model = torch.load(weights_path)
-model.eval()
+if synth == 0:
+    # Load model
+    model = torch.load(weights_path)
+    model.eval()
 
 def Superposition(inpt1,
                   inpt2,
