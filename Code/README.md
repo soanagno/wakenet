@@ -1,4 +1,4 @@
-Independent Research Project
+WakeNet
 ============================
 
 ## Instructions
