@@ -79,14 +79,11 @@ def Create(plots=False):
     print('Synthesizing data...')
 
     # Random Dataset
-    np.random.seed(89)
-    speeds = np.random.rand(data_size)*(ws_range[1] - ws_range[0]) + ws_range[0]  # hub inlet speeds
-    np.random.seed(42)
-    ti = np.random.rand(data_size)*(ti_range[1] - ti_range[0]) + ti_range[0]      # turbulence intensities
+    speeds, ti = WakeNet.tiVsVel(data_size)
     np.random.seed(51)
-    yw = (np.random.rand(data_size) - 0.5)*(yw_range[1] - yw_range[0])            # hub yaw angles
+    yw = (np.random.rand(data_size) - 0.5)*(yw_range[1] - yw_range[0])              # hub yaw angles
     np.random.seed(256)
-    hbs = np.random.rand(data_size)*(hb_range[1] - hb_range[0]) + hb_range[0]     # height slice
+    hbs = np.random.rand(data_size)*(hb_range[1] - hb_range[0]) + hb_range[0]       # height slice
 
     print('Max inlet speed:', round(np.max(speeds), 2), 'm/s')
 
@@ -98,6 +95,7 @@ def Create(plots=False):
     sample_size = 9  # must be perfect square for sample plots
 
     for i in range(data_size):
+        print('=============================', 'Synthetic wake no: ', i, '=============================')
         # fi.floris.farm.set_wake_model('curl')
 
         if inputs == 1:
@@ -252,7 +250,7 @@ def Training(ii,
 
     # Define validation and test batch sizes
     val_batch_size = y_val.size()[1]
-    test_batch_size = y_test.size()[1]
+    # test_batch_size = y_test.size()[1]
 
     train_split = TensorDataset(X_train, y_train[:, :, ii])
     validation_split = TensorDataset(X_val, y_val[:, :, ii])
@@ -288,7 +286,9 @@ def Training(ii,
     val_loss_plot = []; train_loss_plot = []
 
     # Model Training
-    for i in range(epochs):
+    for i_epoch in range(epochs):
+
+        print("Epoch:", i_epoch, '/', epochs)
 
         val_loss = 0; val_acc = 0; train_loss = 0; train_acc = 0; train_loss2 = 0
         val_min = 0
@@ -333,9 +333,9 @@ def Training(ii,
         train_loss_plot.append(train_loss2)
         val_loss_plot.append(val_loss)
 
-    #     print("#" + str(i))
-    #     print ( "Val Loss: " + str(round(val_loss, 4)) + ' Val Acc: ' + str(round(val_acc, 4))) # mean sum squared loss
-    #     print ( "Train Loss: " + str(round(train_loss, 4)) + ' Train Acc: ' + str(round(train_acc, 4))) # mean sum squared loss
+
+        print( "Val Loss: " + str(round(val_loss, 4)) + ' Val Acc: ' + str(round(val_acc, 4))) # mean sum squared loss
+    #     print( "Train Loss: " + str(round(train_loss, 4)) + ' Train Acc: ' + str(round(train_acc, 4))) # mean sum squared loss
 
 
     #------------- Loss and Accuracy Plots -------------#
@@ -349,6 +349,7 @@ def Training(ii,
         train_plot[train_plot > 1] = 1
 
         fig, axs = plt.subplots(1, 2)
+        del fig
 
         fontProperties = {'family':'serif',
             'weight' : 'normal', 'size' : 11}

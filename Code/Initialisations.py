@@ -18,6 +18,7 @@ file_path = data['turbine']['file_path']
 
 # Data creation parameters
 synth = data['data']['synth']
+weather = data['data']['weather']
 row_major = data['data']['row_major']
 x_bnds = data['data']['x_bnds']
 y_bnds = data['data']['y_bnds']

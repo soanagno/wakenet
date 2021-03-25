@@ -4,8 +4,8 @@ import Synth_and_Train as dat
 
 
 if synth == 1:
-
-    # Model training main
+    """Model training main
+    """
 
     # Start trainingtimer
     t0 = time.time()
@@ -58,13 +58,13 @@ else:
         xs = np.array([1*D])
         ys = np.array([1*D])
         yws = [-30]
-        Compare(yws=yws, ws=11, ti=0.05, xs=xs, ys=ys, print_times=True)
+        Compare(yws=yws, ws=6, ti=0.08, xs=xs, ys=ys, print_times=True)
 
         # Multiple
         xs = np.array([1*D, 1*D, 1*D, 4.5*D, 4.5*D, 4.5*D, 8*D, 8*D, 8*D])
         ys = np.array([1*D, 3*D, 5*D, 2*D, 4*D, 6*D, 1*D, 3*D, 5*D])
         yws = [30, -30, 30, -30, 30, -30, 30, -30, 30, -30]
-        Compare(yws=yws, ws=11, ti=0.05, xs=xs, ys=ys, print_times=True)
+        Compare(yws=yws, ws=6, ti=0.08, xs=xs, ys=ys, print_times=True)
 
     if test == 2:
 
@@ -75,13 +75,13 @@ else:
         ys = np.array([0, 0, 0, 4*D, 4*D, 4*D])
         xs = np.array([1*D, 8*D, 15*D, 1*D, 8*D, 15*D])
         yws = np.array([0, 0, 0, 0, 0, 0])
-        Compare(yws=yws, ws=11, ti=0.05, xs=xs, ys=ys, print_times=True)
+        Compare(yws=yws, ws=11, ti=0.12, xs=xs, ys=ys, print_times=True)
 
         # SOS 2
         ys = np.array([0, 1*D, 0.5*D])
         xs = np.array([1*D, 1*D, 4*D])
         yws = np.array([0, 0, 0])
-        Compare(yws=yws, ws=11, ti=0.05, xs=xs, ys=ys, print_times=True)
+        Compare(yws=yws, ws=11, ti=0.12, xs=xs, ys=ys, print_times=True)
 
 
     if test == 3:
@@ -91,21 +91,28 @@ else:
         xs = np.array([1*D, 1*D, 8*D, 8*D, 15*D, 15*D])
         ys = np.array([1*D, 7*D, 1*D, 7*D, 1*D, 7*D])
 
-        florisOptimiser(ws=7, ti=0.05, layout_x=xs, layout_y=ys, plots=True)
-        neuralOptimiser(ws=7, ti=0.05, xs=xs, ys=ys, plots=True, floris_gain=True)
+        # tik = np.linspace(0.01, 0.2, 10)
+        # popt = t = pini = np.zeros(10)
+        # for ii in range(10):
+        #     popt[ii], t[ii], pini[ii] = florisOptimiser(ws=11.5, ti=tik[ii], layout_x=xs, layout_y=ys)
+        #     print(popt[ii], pini[ii])
+        #     input()
+        # print(popt-pini)
+        # exit()
+        # neuralOptimiser(ws=15, ti=0.09, xs=xs, ys=ys, plots=True, floris_gain=True)
 
         # Yaw power heatmaps
-        Assess(xs, ys, res=5, farm_opt=False)
+        Assess(xs, ys, res=10, farm_opt=False)
 
         # Case B (yaw)
         xs = np.array([1*D, 1*D, 1*D, 4.5*D, 4.5*D, 8*D, 8*D, 8*D, 11.5*D, 11.5*D, 15*D, 15*D, 15*D, 18.5*D, 18.5*D])
         ys = np.array([1*D, 5*D, 9*D, 3*D, 7*D, 1*D, 5*D, 9*D, 3*D, 7*D, 1*D, 5*D, 9*D, 3*D, 7*D])
 
-        florisOptimiser(ws=7, ti=0.05, layout_x=xs, layout_y=ys, plots=True)
-        neuralOptimiser(ws=7, ti=0.05, xs=xs, ys=ys, plots=True, floris_gain=True)
+        florisOptimiser(ws=11.5, ti=0.11, layout_x=xs, layout_y=ys, plots=True)
+        neuralOptimiser(ws=11.5, ti=0.11, xs=xs, ys=ys, plots=True, floris_gain=True)
 
         # Yaw power heatmaps
-        Assess(xs, ys, res=5, farm_opt=False)
+        Assess(xs, ys, res=10, farm_opt=False)
 
 
     if test == 4:

@@ -1,5 +1,6 @@
 from Packages import *
 from Initialisations import *
+from median import MedianPool2d
 
 class WakeNet(nn.Module):
 
@@ -48,11 +49,11 @@ class WakeNet(nn.Module):
             self.fc3.append(nn.Linear(hiddenSize2, outputSize, bias = True).to(device))
 
         # Batch normalisation layers
-        self.fc15 = nn.BatchNorm1d(hiddenSize)
-        self.fc25 = nn.BatchNorm1d(hiddenSize2)
+        self.fc15 = nn.BatchNorm1d(hiddenSize, affine=False)
+        self.fc25 = nn.BatchNorm1d(hiddenSize2, affine=False)
 
         # Dropout
-        self.drop = nn.Dropout(0.5) # 50% probability
+        self.drop = nn.Dropout(0.2) # 20% probability
 
         # Activation functions
         self.act = nn.Tanh()
@@ -60,6 +61,12 @@ class WakeNet(nn.Module):
         # self.act = self.tansig
         # self.act2 = nn.Sigmoid()
         self.act2 = self.purelin
+        
+        # self.med = MedianPool2d(kernel_size=4, stride=3, padding=0, same=False)
+        # self.conv = nn.Conv2d(1,1,3,1,bias=False)
+        # self.conv = nn.Conv2d(1, 1, 1, bias=False).to(device)
+        # with torch.no_grad():
+            # self.conv.weight = gaussian_weights
 
 
     def tansig(self, s):
@@ -68,6 +75,65 @@ class WakeNet(nn.Module):
 
     def purelin(self, s):
         return s
+
+    @staticmethod
+    def tiVsVel(n, weather=weather, plots=0):
+        """ Make ti vs speeds distribution
+        """
+
+        if plots==1:
+            np.random.seed(89)
+            xs0 = np.random.rand(data_size)*(ws_range[1] - ws_range[0]) + ws_range[0]  # hub inlet speeds
+            np.random.seed(42)
+            ys0 = np.random.rand(data_size)*(ti_range[1] - ti_range[0]) + ti_range[0]  # turbulence intensities
+
+            lower, upper = ws_range[0], ws_range[1]
+            s = 1e-9
+            mu, sigma = 3, 8
+            xx = stats.truncnorm( (lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma )
+            xs = xx.rvs(n)
+            yy = 2**( 1/(xs+s)/6 ) - 0.9
+            rs = []
+            for _ in range(n):
+                rs.append(-0.01+random.random()*0.02)
+            ys = 2**( 1/(xs+s)/4 ) - 0.9 + rs*(1 + 200*(yy-0.1))
+
+            plt.scatter(xs0, ys0, s=0.5)
+            plt.scatter(xs, ys, s=0.5)
+            plt.show()
+            exit()
+
+        if weather == 0:
+            np.random.seed(89)
+            xs = np.random.rand(data_size)*(ws_range[1] - ws_range[0]) + ws_range[0]  # hub inlet speeds
+            np.random.seed(42)
+            ys = np.random.rand(data_size)*(ti_range[1] - ti_range[0]) + ti_range[0]  # turbulence intensities
+
+        else:
+            lower, upper = ws_range[0], ws_range[1]
+            s = 1e-9
+            # x = np.linspace(lower, upper, n)
+            # y = 2**( 1/(x+s)/6 ) - 0.9
+            # xs = np.random.normal(2, 5, n)
+
+            mu, sigma = 3, 8
+            xx = stats.truncnorm( (lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma )
+            xs = xx.rvs(n)
+            yy = 2**( 1/(xs+s)/6 ) - 0.9
+
+            rs = []
+            for _ in range(n):
+                rs.append(-0.01+random.random()*0.02)
+
+            ys = 2**( 1/(xs+s)/6 ) - 0.9 + rs*(1 + 60*(yy-0.1))
+
+        # plt.plot(x, y, c='k')
+        # plt.xlim(0, 12)
+        # plt.ylim(0, 1)
+        # plt.scatter(xs, ys, s=np.array([0.1]*n))
+        # plt.show()
+
+        return xs, ys
 
 
     def forward(self, X, point):
@@ -94,6 +160,15 @@ class WakeNet(nn.Module):
         # X = self.drop(X)  # dropout (unused)
 
         out = self.act2(self.fc3[point](X))
+        
+        # out = out.view(-1, 200, 200)
+        # out = out.unsqueeze(1)
+        # out = self.med(out)
+        # out = torch.squeeze(out, 1)
+        # out = out.view(-1, 200*200)
+
+        # print('xd', out.shape)
+        # exit()
 
         return out
 
@@ -136,10 +211,7 @@ class WakeNet(nn.Module):
         """
 
         # Random Dataset
-        np.random.seed(89)
-        speeds = np.random.rand(data_size)*(ws_range[1] - ws_range[0]) + ws_range[0]   # hub inlet speeds
-        np.random.seed(42)
-        tis = np.random.rand(data_size)*(ti_range[1] - ti_range[0]) + ti_range[0]      # turbulence intensities
+        speeds, tis = self.tiVsVel(data_size)
         np.random.seed(51)
         yws = (np.random.rand(data_size) - 0.5)*(yw_range[1] - yw_range[0])            # hub yaw angles
         np.random.seed(256)
@@ -149,7 +221,7 @@ class WakeNet(nn.Module):
         # Keep mean and std of data to normalise later
         smean, tmean, ymean, hmean = np.mean(speeds), np.mean(tis), np.mean(yws), np.mean(hbs)
         sstd, tstd, ystd, hstd = np.std(speeds), np.std(tis), np.std(yws), np.std(hbs)
-        
+
         if timings == True or result_plots == True:
 
             t0 = time.time()
@@ -228,7 +300,7 @@ class WakeNet(nn.Module):
         if fltr < 1.0:
             neural[neural > ws*fltr] = ws
 
-       
+
         if cubes == 1:
             # Compose 2D velocity deficit made of blocks
 

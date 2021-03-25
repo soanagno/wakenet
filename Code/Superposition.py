@@ -247,8 +247,8 @@ def Superposition(inpt1,
         
         # Define plot length and height
 
-        row_start = int(domain.shape[0]/2 - np.max(ys)*dy - 2*D*dy+0.5)
-        row_finish = int(domain.shape[0]/2 - np.min(ys)*dy + 2*D*dy-0.5)
+        row_start = int(domain.shape[0]/2 - np.max(ys)*dy - 2*D*dy+1)
+        row_finish = int(domain.shape[0]/2 - np.min(ys)*dy + 2*D*dy)
 
         new_height1 = np.min(ys)-2*D-0.5
         new_height2 = np.max(ys)+2*D+0.5
@@ -270,8 +270,11 @@ def Superposition(inpt1,
 
         # Keep the FLORIS and DNN domains to be plotted
         domain_final = domain[row_start:row_finish, col_start:col_finish]
+        # print(row_start, row_finish)
+        # print(col_start, col_finish)
+        # print(u_mesh.shape)
         u_mesh = u_mesh[row_start:row_finish, col_start:col_finish]
-
+        # print(u_mesh.shape)
         # Set figure properties
         fig, axs = plt.subplots(3, sharex=False)
 

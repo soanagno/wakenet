@@ -6,6 +6,7 @@ import json
 import random
 import warnings
 import numpy as np
+import scipy.stats as stats
 
 from matplotlib import rc
 import matplotlib.pyplot as plt
@@ -28,3 +29,5 @@ import floris.tools as wfct
 import floris.tools.visualization as vis
 from floris.tools.optimization.scipy.yaw import YawOptimization
 from floris.tools.optimization.scipy.layout import LayoutOptimization
+import logging
+logging.getLogger("floris").setLevel(logging.WARNING)

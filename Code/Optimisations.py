@@ -382,8 +382,17 @@ def Assess(xs, ys, res=10, farm_opt=False):
     """
 
     # Wind speeds and turbulence intensities examined
-    x_ws = np.linspace(3.5, 11.5, res)
-    y_ti = np.linspace(0.01, 0.19, res)
+    x_ws = np.linspace(ws_range[0], ws_range[1], res)
+    y_ti = np.linspace(ws_range[0], ws_range[1], res)
+
+    s = 1e-9
+    yy = 2**( 1/(x_ws+s)/6 ) - 0.9
+    rs_min = []; rs_max = []
+    for _ in range(res):
+        rs_min.append(-0.01+0*0.02)
+        rs_max.append(-0.01+1*0.02)
+    ti_min = 2**( 1/(x_ws+s)/6 ) - 0.9 + rs_min*(1 + 60*(yy-0.1))
+    ti_max = 2**( 1/(x_ws+s)/6 ) - 0.9 + rs_max*(1 + 60*(yy-0.1))
 
     # Initialisation of power and timing heatmaps
     g0 = np.zeros((res, res)); g1 = np.zeros((res, res)); g2 = np.zeros((res, res))
@@ -397,6 +406,8 @@ def Assess(xs, ys, res=10, farm_opt=False):
 
         for k2 in range(res):
 
+            # if y_ti[k2] > ti_min[k1] and y_ti[k2] < ti_max[k1]:
+            #     continue
             if farm_opt == True:
                 g1[k1, k2], t1[k1, k2], g0[k1, k2] = florisOptimiser(ws=x_ws[k1], ti=y_ti[k2], layout_x=xs, layout_y=ys, mode='farm')
                 g2[k1, k2], t2[k1, k2] = neuralOptimiser(ws=x_ws[k1], ti=y_ti[k2], xs=xs, ys=ys, floris_gain=True, mode='farm')
@@ -406,19 +417,19 @@ def Assess(xs, ys, res=10, farm_opt=False):
 
     # Calculate FLORIS power gain in MW
     sample = g1 - g0
-    MakeHeatmap(np.flip(sample, 1), x_ws, y_ti, title='Floris optimisation')
+    MakeHeatmap(np.transpose(np.flip(sample, 1)), x_ws, y_ti, title='Floris optimisation')
     # Calculate FLORIS power gain in MW
     sample = g2 - g0
-    MakeHeatmap(np.flip(sample, 1), x_ws, y_ti, title='Neural optimisation')
+    MakeHeatmap(np.transpose(np.flip(sample, 1)), x_ws, y_ti, title='Neural optimisation')
 
     # Calculate FLORIS average time 
     sample = t1
     print('Average FLORIS time:', np.round(np.mean(t1), 2))
-    MakeHeatmap(np.flip(sample, 1), x_ws, y_ti, title='Floris time')
+    MakeHeatmap(np.transpose(np.flip(sample, 1)), x_ws, y_ti, title='Floris time')
     # Calculate DNN average time 
     sample = t2
     print('Average DNN time:', np.round(np.mean(t2), 2))
-    MakeHeatmap(np.flip(sample, 1), x_ws, y_ti, title='Neural time')
+    MakeHeatmap(np.transpose(np.flip(sample, 1)), x_ws, y_ti, title='Neural time')
 
 
 def MakeHeatmap(bitmap, x_ws, y_ti, vmax=None, title=None):
