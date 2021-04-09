@@ -3,8 +3,6 @@ WakeNet: Deep Neural Networks for Wind Turbine Wake modelling and Optimisation
 
 ![](floris_vs_dnn.png)
 
-- **Code**: Contains project modules.
-
 
 **Abstract**
 
