@@ -3,7 +3,7 @@ WakeNet
 
 ## Instructions
 
-Simply edit the ```synth``` value in the ```info.json``` to "1" for data creation/training or to "0" for evaluation. Please refer to the ```main_train_test.py``` file for an indicative demonstration. The ```main_scaling.py``` outputs some additional plots used in the Report (for both ```synth```), namely the wake dataset indicative samples and the computational time vs number of turbines scaling plot.
+Simply edit the ```synth``` value in the ```info.json``` to "1" for synthesizing wakes and network training or to "0" for evaluation. Please refer to the ```main_train_test.py``` file for an indicative demonstration. The ```main_scaling.py``` outputs some additional plots used in the Report (for both ```synth``` values), namely the wake dataset indicative samples and the computational time vs number of turbines scaling plot.
 
 More specifically, each setting parameter included in ```info.json``` and its functionality is listed bellow as it appears in the json:
 
