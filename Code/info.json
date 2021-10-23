@@ -10,7 +10,7 @@
 
 	"data": {
 		"synth": 1,
-		"weather": 1,
+		"weather": 0,
 		"data_size": 4000,
 		"batch_size": 2000,
 		"x_bnds": [0, 3200],
@@ -57,7 +57,7 @@
 	"results": {
 		"weights_path": "test.pth",
 		"fltr": 1.0,
-		"denoise": 5
+		"denoise": 2
 		},
 
 	"optimisation": {
