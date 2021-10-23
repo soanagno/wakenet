@@ -48,3 +48,4 @@ class MedianPool2d(nn.Module):
         x = x.unfold(2, self.k[0], self.stride[0]).unfold(3, self.k[1], self.stride[1])
         x = x.contiguous().view(x.size()[:4] + (-1,)).median(dim=-1)[0]
         return x
+    
