@@ -4,7 +4,7 @@ from median import MedianPool2d
 
 class WakeNet(nn.Module):
 
-    def __init__(self, inputs = 3, hiddenSize = 100, hiddenSize2 = 100):
+    def __init__(self, inputs = 3, hiddenSize = 200, hiddenSize2 = 200):
         """
         WakeNet initializations
 
@@ -93,12 +93,13 @@ class WakeNet(nn.Module):
             xx = stats.truncnorm( (lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma )
             xs = xx.rvs(n)
             yy = 2**( 1/(xs+s)/6 ) - 0.9
+
             rs = []
             for _ in range(n):
                 rs.append(-0.01+random.random()*0.02)
-            ys = 2**( 1/(xs+s)/4 ) - 0.9 + rs*(1 + 200*(yy-0.1))
+            ys = 2**( 1/(xs+s)/6 ) - 0.9 + rs*(1 + 60*(yy-0.1))
 
-            plt.scatter(xs0, ys0, s=0.5)
+            # plt.scatter(xs0, ys0, s=0.5)
             plt.scatter(xs, ys, s=0.5)
             plt.show()
             exit()
@@ -112,10 +113,6 @@ class WakeNet(nn.Module):
         else:
             lower, upper = ws_range[0], ws_range[1]
             s = 1e-9
-            # x = np.linspace(lower, upper, n)
-            # y = 2**( 1/(x+s)/6 ) - 0.9
-            # xs = np.random.normal(2, 5, n)
-
             mu, sigma = 3, 8
             xx = stats.truncnorm( (lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma )
             xs = xx.rvs(n)
@@ -124,7 +121,6 @@ class WakeNet(nn.Module):
             rs = []
             for _ in range(n):
                 rs.append(-0.01+random.random()*0.02)
-
             ys = 2**( 1/(xs+s)/6 ) - 0.9 + rs*(1 + 60*(yy-0.1))
 
         # plt.plot(x, y, c='k')

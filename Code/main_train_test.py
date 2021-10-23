@@ -58,13 +58,13 @@ else:
         xs = np.array([1*D])
         ys = np.array([1*D])
         yws = [-30]
-        Compare(yws=yws, ws=6, ti=0.08, xs=xs, ys=ys, print_times=True)
+        Compare(yws=yws, ws=6, ti=0.12, xs=xs, ys=ys, print_times=True)
 
         # Multiple
         xs = np.array([1*D, 1*D, 1*D, 4.5*D, 4.5*D, 4.5*D, 8*D, 8*D, 8*D])
         ys = np.array([1*D, 3*D, 5*D, 2*D, 4*D, 6*D, 1*D, 3*D, 5*D])
         yws = [30, -30, 30, -30, 30, -30, 30, -30, 30, -30]
-        Compare(yws=yws, ws=6, ti=0.08, xs=xs, ys=ys, print_times=True)
+        Compare(yws=yws, ws=6, ti=0.12, xs=xs, ys=ys, print_times=True)
 
     if test == 2:
 
