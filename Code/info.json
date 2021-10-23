@@ -9,7 +9,7 @@
 		},
 
 	"data": {
-		"synth": 0,
+		"synth": 1,
 		"weather": 1,
 		"data_size": 4000,
 		"batch_size": 2000,
