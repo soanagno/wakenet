@@ -14,11 +14,12 @@ def superposition(inpt1,
                   wind_speed=None, 
                   farm_opt=False, 
                   plots=False, 
-                  optimize=True, 
+                  power_opt=True, 
                   print_times=False, 
                   timings=False, 
                   floris_gain=False, 
-                  x0=np.zeros(1)):
+                  x0=np.zeros(1),
+                  single=False):
     """
     Calls the neural model to produce neural wakes and superimposes them on the
     computational domain in order to calculate the total farm power output in MW.
@@ -32,7 +33,7 @@ def superposition(inpt1,
         cp (numpy array of floats) Cp values of turbine Cp-wind speed curve.
         wind_speed (numpy array of floats) Wind speed values of turbine Cp-wind speed curve.
         plots (boolean, optional) If True, Plots superimposed wakes.
-        optimize (boolean, optional) If True, performs one optimization step.
+        power_opt (boolean, optional) If True, performs one optimization step.
         print_times (boolean, optional) If True, prints timings.
         timings (boolean, optional) Returns model timings.
         floris_gain (boolean, optional) If True, calculates and returns gained power output
@@ -119,6 +120,7 @@ def superposition(inpt1,
     cols2 = int(dx*xs[p] + 0.5) + dimx
 
     # Start DNN timer
+    neural_old = np.ones((dimx, dimy)) * inlet_speed
     t0 = time.time()
     for p in range(xs.size):
 
@@ -162,8 +164,16 @@ def superposition(inpt1,
         if inlet_speed < ws_range[0]:
             inlet_speed = ws_range[0]
 
+        # Single wake condition
+        if single == True:
+            inlet_speed_power = u_stream
+
+        # if p == 0 or p == 1:
+        #     inlet_speed_power = inlet_speed
+
         # Get the DNN result
-        neural = model.compareContour(u_stream, ref_point, inlet_speed, tis, -yws[p], hbs, model)
+        neural = model.compareContour(u_stream, ref_point, inlet_speed,
+                                      tis, -yws[p], hbs, model)
 
         # Save the inlet speed terms
         hub_speeds[p] = inlet_speed
@@ -171,7 +181,8 @@ def superposition(inpt1,
         hub_speeds_power[p] = inlet_speed_power
         
         # Apply SOS for after the first turbine is placed in the domain
-        if p != 0 and p != (xs.size):
+        # if p != 0 and p != (xs.size):
+        if p != (xs.size):
 
             # Filter out wakes
             neural[neural == u_stream] = hub_speeds[p]
@@ -278,11 +289,7 @@ def superposition(inpt1,
 
         # Keep the FLORIS and DNN domains to be plotted
         domain_final = domain[row_start:row_finish, col_start:col_finish]
-        # print(row_start, row_finish)
-        # print(col_start, col_finish)
-        # print(u_mesh.shape)
         u_mesh = u_mesh[row_start:row_finish, col_start:col_finish]
-        # print(u_mesh.shape)
         # Set figure properties
         fig, axs = plt.subplots(3, sharex=False)
 
@@ -360,29 +367,26 @@ def superposition(inpt1,
 
         plt.show()
 
-    if optimize == True:
+    if power_opt == True:
 
         # Calculation of total farm power
 
         rho = 1.225  # air density
-        # hub_speeds_old = np.copy(hub_speeds)
+        hub_speeds_old = np.copy(hub_speeds)
         # hub_speeds_old = np.copy(hub_speeds_mean)
-        hub_speeds_old = np.copy(hub_speeds_power)
+        # hub_speeds_old = np.copy(hub_speeds_power)
 
         # Interpolate cp values
         cp_interp = np.interp(hub_speeds_old, wind_speed, cp)
 
         # Multiply by cos(theta) term
-        cp_interp *= np.cos(np.pi/180*(-yws))**(2.0)  # ref 1.4
+        cp_interp *= np.cos(np.pi/180*(-yws))**(1.0)  # ref 2.0
 
         # Calculate powers using the kinetic energy term
-        # power_tot = 0.5*rho*cp_interp*hub_speeds_power
-        power_tot = 0.5*rho*cp_interp*hub_speeds_power**3*area
+        power_tot = 0.5*rho*cp_interp*hub_speeds**3*area
 
         # Sum of all turbine power outputs
         power_tot = np.sum(power_tot)
-        # print(power_tot/1e6)
-        # exit()
         
         if floris_gain == True:
             # Calculate power gain as provided by FLORIS

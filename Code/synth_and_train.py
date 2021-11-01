@@ -194,11 +194,16 @@ def create(plots=False):
             sample_plots = []
             cnt += 1
 
-    # Apply normalisations on inputs
-    yw = normalise(yw, norm)
-    ti = normalise(ti, norm)
-    speeds = normalise(speeds, norm)
-    hbs = normalise(hbs, norm)
+    # # Apply normalisations on inputs
+    # yw = normalise(yw, norm)
+    # ti = normalise(ti, norm)
+    # speeds = normalise(speeds, norm)
+    # hbs = normalise(hbs, norm)
+
+    speeds = ((speeds - ws_range[0]) / (ws_range[1] - ws_range[0])-0.5)*3
+    ti = ((ti - ti_range[0]) / (ti_range[1] - ti_range[0])-0.5)*3
+    yw = ((yw - yw_range[0]) / (yw_range[1] - yw_range[0])-0.5)*3
+    hbs = ((hbs - hb_range[0]) / (hb_range[1] - hb_range[0])-0.5)*3
 
     # Make X and y
     X_input = np.zeros((data_size, inputs))

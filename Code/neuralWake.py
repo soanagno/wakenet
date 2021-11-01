@@ -6,7 +6,7 @@ class wakeNet(nn.Module):
     wakeNet class definition
     """
 
-    def __init__(self, inputs=3, hiddenSize=200, hiddenSize2=200):
+    def __init__(self, inputs=3, hiddenSize=100, hiddenSize2=100):
         """
         wakeNet initializations
 
@@ -69,6 +69,7 @@ class wakeNet(nn.Module):
 
     def purelin(self, s):
         return s
+
 
     @staticmethod
     def tiVsVel(n, weather=weather, plots=False):
@@ -191,6 +192,8 @@ class wakeNet(nn.Module):
             
             final (2D numpy float array) Wake profile with u_stream background velocity.
         """
+        yw = np.array(yw)
+        hb = np.array(hb)
 
         # Random Dataset
         speeds, tis = self.tiVsVel(data_size)
@@ -258,11 +261,22 @@ class wakeNet(nn.Module):
         # Initialise neural output vector
         neural = np.zeros(dimx * dimy)
 
-        # Normalise inputs
-        speed_norm = (ws-smean)/sstd
-        ti_norm = (ti - tmean)/tstd
-        yw_norm = (yw - ymean)/ystd
-        hbs_norm = (hb - hmean)/hstd
+        # # Normalise inputs
+        # speed_norm = (ws-smean)/sstd
+        # ti_norm = (ti - tmean)/tstd
+        # yw_norm = (yw - ymean)/ystd
+        # hbs_norm = (hb - hmean)/hstd
+
+        # # Normalise inputs
+        # speed_norm = (ws-smean)/sstd
+        # ti_norm = (ti - tmean)/tstd
+        # yw_norm = (yw - ymean)/ystd
+        # hbs_norm = (hb - hmean)/hstd
+
+        speed_norm = ((ws - ws_range[0]) / (ws_range[1] - ws_range[0])-0.5)*3
+        ti_norm = ((ti - ti_range[0]) / (ti_range[1] - ti_range[0])-0.5)*3
+        yw_norm = ((yw - yw_range[0]) / (yw_range[1] - yw_range[0])-0.5)*3
+        hbs_norm = ((hb - hb_range[0]) / (hb_range[1] - hb_range[0])-0.5)*3
 
         # Make input tensor
         if inputs == 1:
@@ -330,8 +344,8 @@ class wakeNet(nn.Module):
                 fig.suptitle('Velocities(m/s): Analytical (top), Neural (bot)')
                 im1 = axs[0].imshow(u_mesh, vmin = vmin, cmap=cmap,
                                     extent=[x_bounds[0], x_bounds[1], y_bounds[0], y_bounds[1]])
-                fig.colorbar(im1, ax = axs[0])
 
+                fig.colorbar(im1, ax = axs[0])
                 # neural = np.kron(neural, np.ones((int(200/dim), int(200/dim))))
                 im2 = axs[1].imshow(neural, vmin = vmin, interpolation=None, cmap=cmap, 
                                     extent=[x_bounds[0], x_bounds[1], y_bounds[0], y_bounds[1]])
@@ -362,6 +376,7 @@ class wakeNet(nn.Module):
 
         # Replace current turbine inlet speed (ws) with farm u_stream (for superimposed wakes)
         final[final == ws] = u_stream
+
         if result_plots == 1:
             plt.imshow(final, extent=[x_bounds[0], x_bounds[1], y_bounds[0], y_bounds[1]])
             plt.show()
