@@ -58,7 +58,7 @@ else:
         xs = np.array([1*D])
         ys = np.array([1*D])
         yws = [-30]
-        compare(yws=yws, ws=6, ti=0.12, xs=xs, ys=ys, print_times=True)
+        compare(plots=True, yws=yws, ws=12, ti=0.12, xs=xs, ys=ys, print_times=True, single=False)
 
         # Multiple
         xs = np.array([1*D, 1*D, 1*D,
@@ -70,12 +70,12 @@ else:
         yws = [30, -30, 30, -30, 30, -30, 30, -30, 30, -30]
 
         # Multiple
-        xs = np.array([1*D, 1*D, 1*D,
-                       8*D, 8*D, 8*D])
-        ys = np.array([1*D, 3*D, 5*D,
-                       1*D, 3*D, 5*D])
-        yws = [30, -30, 30, 30, -30, 30, -30]
-        compare(yws=yws, ws=6, ti=0.12, xs=xs, ys=ys, print_times=True)
+        xs = np.array([1*D, 1*D,
+                       8*D, 8*D])
+        ys = np.array([1*D, 5*D,
+                       1*D, 5*D])
+        yws = [30, 30, -30, -30]
+        compare(plots=True, yws=yws, ws=6, ti=0.12, xs=xs, ys=ys, print_times=True)
 
     if test == 2:
 
@@ -86,17 +86,24 @@ else:
         ys = np.array([0, 0, 0, 4*D, 4*D, 4*D])
         xs = np.array([1*D, 8*D, 15*D, 1*D, 8*D, 15*D])
         yws = np.array([0, 0, 0, 0, 0, 0])
-        compare(yws=yws, ws=11, ti=0.12, xs=xs, ys=ys, print_times=True)
+        compare(plots=True, yws=yws, ws=11, ti=0.12, xs=xs, ys=ys, print_times=True)
 
         # SOS 2
         ys = np.array([0, 1*D, 0.5*D])
         xs = np.array([1*D, 1*D, 4*D])
         yws = np.array([0, 0, 0])
-        compare(yws=yws, ws=11, ti=0.12, xs=xs, ys=ys, print_times=True)
+        compare(plots=True, yws=yws, ws=11, ti=0.12, xs=xs, ys=ys, print_times=True)
 
 
     if test == 3:
+
         # Yaw Optimisation
+
+        xs = np.array([1*D, 5.762*D])
+        ys = np.array([1*D, 1*D])
+        # compare(plots=True, yws=[18, 0], ws=9, ti=0.1, xs=xs, ys=ys, print_times=True)
+        # exit()
+        yawVsPowerContour(ws=9, ti=0.1, xs=xs, ys=ys, res=10, farm_opt=False)
 
         # Case A (yaw)
         xs = np.array([1*D, 1*D, 8*D, 8*D, 15*D, 15*D])
@@ -105,12 +112,8 @@ else:
         florisOptimiser(ws=7, ti=0.11, layout_x=xs, layout_y=ys, plots=True)
         neuralOptimiser(ws=7, ti=0.11, xs=xs, ys=ys, plots=True, floris_gain=True)
 
-        exit()
-
         # Yaw power heatmaps
         heatmap(xs, ys, res=10, farm_opt=False)
-
-        exit()
 
         # Case B (yaw)
         xs = np.array([1*D, 1*D, 1*D, 4.5*D, 4.5*D,
