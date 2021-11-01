@@ -261,18 +261,13 @@ class wakeNet(nn.Module):
         # Initialise neural output vector
         neural = np.zeros(dimx * dimy)
 
-        # # Normalise inputs
+        # # Standardisation
         # speed_norm = (ws-smean)/sstd
         # ti_norm = (ti - tmean)/tstd
         # yw_norm = (yw - ymean)/ystd
         # hbs_norm = (hb - hmean)/hstd
 
-        # # Normalise inputs
-        # speed_norm = (ws-smean)/sstd
-        # ti_norm = (ti - tmean)/tstd
-        # yw_norm = (yw - ymean)/ystd
-        # hbs_norm = (hb - hmean)/hstd
-
+        # Normalisation
         speed_norm = ((ws - ws_range[0]) / (ws_range[1] - ws_range[0])-0.5)*3
         ti_norm = ((ti - ti_range[0]) / (ti_range[1] - ti_range[0])-0.5)*3
         yw_norm = ((yw - yw_range[0]) / (yw_range[1] - yw_range[0])-0.5)*3
