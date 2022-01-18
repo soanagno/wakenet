@@ -3,7 +3,7 @@
 ## Network architecture
 
 <p align="center">
-  <img src="https://github.com/soanagno/wakeNet/blob/master/architecture.png" width="500">
+  <img src="https://github.com/soanagno/wakeNet/blob/master/architecture.png" width="800">
 </p>
 
 ## Results
