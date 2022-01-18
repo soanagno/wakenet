@@ -1,7 +1,7 @@
 # WakeNet: Deep Neural Networks for Wind Turbine Wake modelling and Optimisation
 
 ## Network architecture
-![](architecture.png | width=100)
+![](architecture.png width="100")
 
 ## Results
 ![](floris_vs_dnn.png)
