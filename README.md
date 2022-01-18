@@ -8,7 +8,7 @@
 
 ## Results
 <p align="center">
-  <img src="https://github.com/soanagno/wakeNet/blob/master/floris_vs_dnn.png width="700">
+  <img src="https://github.com/soanagno/wakeNet/blob/master/floris_vs_dnn.png" width="700">
 </p>
   
 **Abstract**
