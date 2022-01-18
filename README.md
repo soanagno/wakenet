@@ -2,7 +2,7 @@
 
 ## Network architecture
 
-<img src="https://github.com/soanagno/wakeNet/blob/master/architecture.png" width="2000">
+<img src="https://github.com/soanagno/wakeNet/blob/master/architecture.png" width="1000">
 
 ## Results
 ![](floris_vs_dnn.png)
