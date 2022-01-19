@@ -1,4 +1,4 @@
-WakeNet
+wakeNet
 ============================
 
 ## Instructions
