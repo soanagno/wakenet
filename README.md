@@ -1,4 +1,4 @@
-# WakeNet: Deep Neural Networks for Wind Turbine Wake modelling and Optimisation
+# wakeNet: Deep Neural Networks for Wind Turbine Wake modelling and Optimisation
 
 ## Abstract
 
