@@ -10,7 +10,11 @@ Offshore wind farm modelling has been an area of rapidly increasing interest ove
   <img src="https://github.com/soanagno/wakeNet/blob/master/dnn_fig.png">
 </p>
 
-## Floris reference
+## Publication available at:
+
+https://iopscience.iop.org/article/10.1088/1742-6596/2151/1/012011
+
+## FLORIS repository:
 
 https://github.com/NREL/floris
 
