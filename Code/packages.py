@@ -21,6 +21,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import dask
 from dask.distributed import Client, progress
 
+from scipy import interp
 from scipy import ndimage
 from scipy import interpolate
 from scipy.optimize import minimize
@@ -30,4 +31,5 @@ import floris.tools.visualization as vis
 from floris.tools.optimization.scipy.yaw import YawOptimization
 from floris.tools.optimization.scipy.layout import LayoutOptimization
 import logging
+
 logging.getLogger("floris").setLevel(logging.WARNING)
