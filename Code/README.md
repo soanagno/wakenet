@@ -79,6 +79,3 @@ opt_cbound (float): x-boundary optimisation contraint defined in number of diame
 opt_cbound (float): y-boundary optimisation contraint defined in number of diameters (D).
 ```
 
-Note that the user only needs to change the synth value depending on the use, as the default values were the ones used in the Report.
-
-
