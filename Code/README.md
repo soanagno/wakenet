@@ -3,7 +3,13 @@ wakeNet
 
 ## Instructions
 
-Simply edit the ```synth``` value in the ```info.json``` to "1" for synthesizing wakes and network training or to "0" for evaluation. Please refer to the ```train_test_dnn.py``` file for an indicative demonstration. The ```turbine_scaling.py``` outputs some additional plots used in the Report (for both ```synth``` values), namely the wake dataset indicative samples and the computational time vs number of turbines scaling plot.
+1) To either train or evaluate execute the following command:
+
+```python -u train_test_dnn.py```
+
+2) Make sure to edit the ```inputs.json``` file accordingly:
+
+Simply set the ```train_net``` value to "1" for training mode or to "0" for evaluation mode. On training mode, set ```make_data``` to "true" if you want to generate the wakes or to "false" if you want to read the wakes from the "wake_dataset" within the same directory. To create the "wake_dataset" folder set ```save_data``` to true and run the ```main_train-test.py``` once. The ```turbine_scaling.py``` outputs some additional plots used in the Report (for both ```train_net``` values), namely the wake dataset indicative samples and the computational time vs number of turbines scaling plot.
 
 More specifically, each setting parameter included in ```info.json``` and its functionality is listed bellow as it appears in the json:
 
@@ -14,12 +20,16 @@ cut_plane (float): height of the 2D plane of the DNN training. default is hub he
 ```
 #### data
 ```
-synth (boolean): 0 for data synthesizing and training, 1 for evaluation mode.
+train_net (boolean): 0 for training mode, 1 for evaluation mode.
+make_data (boolean): true for wake generation, false to load wakes from wake_dataset folder.
+save_data (boolean): set to true to create wake_dataset folder.
+curl (boolean): set to true to train dnn on the curl model and false on the gaussian model.
+weather (boolean): create dataset based on realistic wind data (data_size and batch_size must be changed).
 data_size (float): total number of wakes used for training
 batch_size (float): batch size of each backward propagation.
 x_bnds (vector): x-boundaries of wakes produced by FLORIS.
 y_bnds (vector): y-boundaries of wakes produced by FLORIS.
-full_domain (boolean): 0 for domain partitioning (using sub-networks), 1 for use of full domain during training.
+full_domain (boolean): 1 for use of full domain during, 0 for domain partitioning (using sub-networks).
 row_major (boolean): row-major (1) or column major (0) partitioning.
 dimx (float): x-resolution of wake domain as calculated by FLORIS.
 dimy (float): y-resolution of wake domain as calculated by FLORIS.
@@ -41,7 +51,7 @@ hb_range (vector): hub slice range (unused).
 ```
 #### training
 ```
-device (cpu or gpu): defines the computation device.
+device (cpu or cuda): defines the computation device.
 parallel (boolean): if true and also device="cpu", initialises parallel computations.
 para_workers (int): number of parallel workers.
 seed (int): random seed for gpu computations.
