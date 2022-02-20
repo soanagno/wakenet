@@ -23,7 +23,7 @@ cut_plane (float): height of the 2D plane of the DNN training. default is hub he
 train_net (boolean): 0 for training mode, 1 for evaluation mode.
 make_data (boolean): true for wake generation, false to load wakes from wake_dataset folder.
 save_data (boolean): set to true to create wake_dataset folder.
-curl (boolean): set to true to train dnn on the curl model and false on the gaussian model.
+curl (boolean): set to true to train dnn on the curl model and false on the gaussian model (experimental).
 weather (boolean): create dataset based on realistic wind data (data_size and batch_size must be changed).
 data_size (float): total number of wakes used for training
 batch_size (float): batch size of each backward propagation.
