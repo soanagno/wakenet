@@ -9,7 +9,7 @@
 		},
 
 	"data": {
-		"train_net": 0,
+		"train_net": 1,
 		"make_data": true,
 		"save_data": false,
 		"curl": 0,
