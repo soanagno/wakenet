@@ -82,14 +82,3 @@ opt_cbound (float): y-boundary optimisation contraint defined in number of diame
 Note that the user only needs to change the synth value depending on the use, as the default values were the ones used in the Report.
 
 
-## Requirements
-
-* Python (3.9.7)
-* FLORIS (2.4)
-* Numpy (1.21.3)
-* SciPy (1.7.1)
-* Matplotlib (3.4.3)
-* Torch (1.10.0)
-* Dask (2021.10.0), optional
-* Cuda (11.3), optional
-
