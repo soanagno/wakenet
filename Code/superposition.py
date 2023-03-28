@@ -315,7 +315,6 @@ def superposition(
             nocut=1
         if nocut != 1:
             if single == True:
-                print('SINGLE')
                 cut_plane = fi.get_hor_plane(height=hbs,
                                             x_bounds=x_bounds,
                                             y_bounds=y_bounds,
@@ -467,8 +466,6 @@ def superposition(
             power_tot = pw_ar
         else:
             rho = 1.225  # air density
-            # hub_speeds_old = np.copy(hub_speeds)
-            # hub_speeds_old = np.copy(hub_speeds_mean)
             hub_speeds_old = np.copy(hub_speeds_power)
 
             # Interpolate cp values
@@ -484,7 +481,7 @@ def superposition(
         
         # Sum of all turbine power outputs
         power_tot = np.sum(power_tot)
-
+        
         if floris_gain == True:
             # Calculate power gain as provided by FLORIS (for final assessment of optimisation).
 
@@ -497,11 +494,12 @@ def superposition(
                 fi.reinitialize_flow_field(layout_array=[xs0, ys0])
             else:
                 fi.reinitialize_flow_field(layout_array=[xs, ys])
+            
             fi.calculate_wake(yaw_angles=yaw_ini)
             # Get initial FLORIS power
             floris_power_0 = fi.get_farm_power()
             floris_power_opt = florisPw(u_stream, tis, xs, ys, yws)
-
+            
             floris_power_gain = round(
                 (floris_power_opt - floris_power_0) / floris_power_0 * 100, 2
             )
@@ -512,7 +510,6 @@ def superposition(
                 print("Floris Optimal power", round(floris_power_opt / 1e6, 2), "MW")
                 print("Floris Power Gain (%)", floris_power_gain)
                 print("-----------------------------------------------------")
-
             return -power_tot, floris_power_opt/1e6, floris_power_0/1e6
 
         else:
