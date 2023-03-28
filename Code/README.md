@@ -3,13 +3,13 @@ wakeNet
 
 ## Instructions
 
-1) To either train or evaluate execute the following command:
+1) Edit the ```.json``` input file:
 
-```python -u train_test_dnn.py```
+Simply set the ```train_net``` value to "1" for training mode or to "0" for evaluation mode. On training mode, set ```make_data``` to "true" if you want to generate the wakes or to "false" if you want to read the wakes from the "wake_dataset" folder within the same directory. To create the "wake_dataset" folder set ```save_data``` to true and run the ```example_main.py```.
 
-2) Make sure to edit the ```inputs.json``` file accordingly:
+2) To either train or evaluate execute the following command:
 
-Simply set the ```train_net``` value to "1" for training mode or to "0" for evaluation mode. On training mode, set ```make_data``` to "true" if you want to generate the wakes or to "false" if you want to read the wakes from the "wake_dataset" within the same directory. To create the "wake_dataset" folder set ```save_data``` to true and run the ```main_train-test.py``` once. The ```turbine_scaling.py``` outputs some additional plots used in the Report (for both ```train_net``` values), namely the wake dataset indicative samples and the computational time vs number of turbines scaling plot. Note that the example .json files in "example_inputs" have to be renamed as "inputs.json" to be used.
+```python -u example_main.py```
 
 More specifically, each setting parameter included in ```inputs.json``` and its functionality is listed bellow as it appears in the json:
 
