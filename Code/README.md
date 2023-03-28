@@ -5,7 +5,7 @@ wakeNet
 
 1) Edit the ```.json``` input file:
 
-Simply set the ```train_net``` value to "1" for training mode or to "0" for evaluation mode. On training mode, set ```make_data``` to "true" if you want to generate the wakes or to "false" if you want to read the wakes from the "wake_dataset" folder within the same directory. To create the "wake_dataset" folder set ```save_data``` to true and run the ```example_main.py```.
+Simply set the ```train_net``` value to "true" for training mode or to "false" for evaluation mode. On training mode, set ```make_data``` to "true" if you want to generate the wakes or to "false" if you want to read the wakes from the "wake_dataset" folder within the same directory. To create the "wake_dataset" folder set ```save_data``` to true and run the ```example_main.py```.
 
 2) To either train or evaluate execute the following command:
 
