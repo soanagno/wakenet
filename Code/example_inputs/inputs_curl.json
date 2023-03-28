@@ -9,25 +9,27 @@
 		},
 
 	"data": {
-		"train_net": 1,
+		"train_net": 0,
 		"make_data": false,
 		"save_data": false,
+		"local_ti": false,
+		"local_pw": true,
 		"curl": 1,
 		"weather": 0,
 		"data_size": 2000,
-		"batch_size": 200,
-		"x_bnds": [0, 3780],
-		"y_bnds": [-252, 252],
+		"batch_size": 500,
+		"x_bounds": [0, 3780],
+		"y_bounds": [-252, 252],
 		"full_domain": true,
 		"row_major": true,
-		"dimx": 750,
+		"dimx": 625,
 		"dimy": 100,
 		"cubes": false,
 		"dim1": 20,
 		"dim2": 20,
 		"norm": 2,
 		"inputs": 3,
-		"plot_curves": true,
+		"plot_curves": false,
 		"result_plots": false,
 		"defo": false
 		},
@@ -35,7 +37,7 @@
 	"data_range": {
 		"ws_range": [3, 15],
 		"ti_range": [0.01, 0.2],
-		"yw_range": [-35, 35],
+		"yw_range": [-30, 30],
 		"hb_range": [27, 153]
 
 	},
@@ -45,10 +47,10 @@
 		"parallel": false,
 		"para_workers": 8,
 		"seed": 42,
-		"epochs": 60,
+		"epochs": 2000,
 		"lr": 1e-2,
 		"momentum": 0.99,
-		"opt_method": "Rprop",
+		"opt_method": "Adam",
 		"test_batch_size": "None",
 		"weight_decay": 0.0,
 		"workers": 0,
@@ -58,15 +60,16 @@
 		},
 
 	"results": {
-		"weights_path": "weights_curl.pth",
+		"weights_path": "weights_curl.pt",
 		"fltr": 1.0,
-		"denoise": 1
+		"denoise": 1,
+		"contours_on": 0
 		},
 
 	"optimisation": {
 		"yaw_ini": 0,
-		"opt_xbound": 20,
-		"opt_ybound": 10
+		"opt_xbound": 20.0,
+		"opt_ybound": 15.0
 	}
 
 }
