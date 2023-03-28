@@ -10,7 +10,7 @@ Wind farm modelling is an area of rapidly increasing interest with numerous anal
   <img src="https://github.com/soanagno/wakeNet/blob/master/wakenet_fig.png">
 </p>
 
-## Publication available at:
+## Paper available at:
 
 https://iopscience.iop.org/article/10.1088/1742-6596/2151/1/012011
 
