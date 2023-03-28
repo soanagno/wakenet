@@ -10,7 +10,7 @@ from floris.tools import static_class as sc
 
 # Open JSON file (change based on the wake model)
 neural_info = open(
-    "inputs_gauss.json",
+    "example_inputs/inputs_gauss.json",
 )
 
 
