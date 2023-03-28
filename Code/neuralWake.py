@@ -7,13 +7,12 @@ class wakeNet(nn.Module):
     wakeNet class definition
     """
 
-    def __init__(self, inputs=3, hiddenSize=100, hiddenSize2=200, hiddenSize3=100):
+    def __init__(self, inputs=3, hidden_neurons=[100, 200]):
         """
         wakeNet initializations
 
         Args:
             u_stream (torch float array) Inputs of training step.
-            points (int): Number of individual sub-network to be trained.
             ws (float) Wind speed.
             ti (float) Turbulence intensity.
             yw (float) Yaw angle.
@@ -33,37 +32,35 @@ class wakeNet(nn.Module):
 
         super(wakeNet, self).__init__()
 
+
         # Parameters
-        inputSize = inputs
-        outputSize = out_piece
-        points = rows
+        self.inputSize = inputs
+        self.outputSize = out_piece
+        self.hidden_neurons = hidden_neurons
+        self.layers = len(self.hidden_neurons) + 1
+        iSize = [self.inputSize] + self.hidden_neurons + [self.outputSize]
 
         # Initialisation of linear layers
-        self.fc1 = []
-        self.fc2 = []
-        # self.fc2_ = []
-        self.fc3 = []
-
-        # Append independent sub-networks in parallel
-        for _ in range(points):
-            self.fc1.append(nn.Linear(inputSize, hiddenSize, bias=True).to(device))
-            self.fc2.append(nn.Linear(hiddenSize, hiddenSize2, bias=True).to(device))
-            # self.fc2_.append(nn.Linear(hiddenSize2, hiddenSize3, bias = True).to(device))
-            self.fc3.append(nn.Linear(hiddenSize2, outputSize, bias=True).to(device))
-
-        # Batch normalisation layers
-        self.fc15 = nn.BatchNorm1d(hiddenSize, affine=False).to(device)
-        self.fc25 = nn.BatchNorm1d(hiddenSize2, affine=False).to(device)
-        # self.fc25_ = nn.BatchNorm1d(hiddenSize3, affine=False).to(device)
+        self.fc = []
+        # Append layers
+        for psi in range(self.layers):
+            self.fc.append(nn.Linear(iSize[psi], iSize[psi+1], bias=True).to(device))
+        self.fc1 = nn.Linear(iSize[0], iSize[1], bias=True).to(device)
+        self.fc2 = nn.Linear(iSize[1], iSize[2], bias=True).to(device)
+        self.fc3 = nn.Linear(iSize[2], iSize[3], bias=True).to(device)
+        # Initialisation of batchnorm layers
+        self.fcb = []
+        # Append layers
+        for psi in range(self.layers-1):
+            self.fcb.append(nn.BatchNorm1d(iSize[psi+1], affine=False).to(device))
+        self.fcb1 = nn.BatchNorm1d(iSize[1], affine=False).to(device)
+        self.fcb2 = nn.BatchNorm1d(iSize[2], affine=False).to(device)
 
         # Dropout
         self.drop = nn.Dropout(0.2).to(device)  # 20% probability
 
         # Activation functions
         self.act = nn.Tanh().to(device)
-        # self.act = nn.Sigmoid()
-        # self.act = self.tansig
-        # self.act2 = nn.Sigmoid()
         self.act2 = self.purelin
 
     def tansig(self, s):
@@ -78,20 +75,14 @@ class wakeNet(nn.Module):
 
         if plots == True:
             np.random.seed(89)
-            xs0 = (
-                np.random.rand(data_size) * (ws_range[1] - ws_range[0]) + ws_range[0]
-            )  # ws
+            xs0 = (np.random.rand(data_size) * (ws_range[1] - ws_range[0]) + ws_range[0])  # ws
             np.random.seed(42)
-            ys0 = (
-                np.random.rand(data_size) * (ti_range[1] - ti_range[0]) + ti_range[0]
-            )  # ti
+            ys0 = (np.random.rand(data_size) * (ti_range[1] - ti_range[0]) + ti_range[0])  # ti
 
             lower, upper = ws_range[0], ws_range[1]
             s = 1e-9
             mu, sigma = 3, 8
-            xx = stats.truncnorm(
-                (lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma
-            )
+            xx = stats.truncnorm((lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma)
             xs = xx.rvs(n)
             yy = 2 ** (1 / (xs + s) / 6) - 0.9
 
@@ -100,28 +91,21 @@ class wakeNet(nn.Module):
                 rs.append(-0.01 + random.random() * 0.02)
             ys = 2 ** (1 / (xs + s) / 6) - 0.9 + rs * (1 + 60 * (yy - 0.1))
 
-            # plt.scatter(xs0, ys0, s=0.5)
             plt.scatter(xs, ys, s=0.5)
             plt.show()
             exit()
 
         if weather == False:
             np.random.seed(89)
-            xs = (
-                np.random.rand(data_size) * (ws_range[1] - ws_range[0]) + ws_range[0]
-            )  # ws
+            xs = (np.random.rand(data_size) * (ws_range[1] - ws_range[0]) + ws_range[0])  # ws
             np.random.seed(42)
-            ys = (
-                np.random.rand(data_size) * (ti_range[1] - ti_range[0]) + ti_range[0]
-            )  # ti
+            ys = (np.random.rand(data_size) * (ti_range[1] - ti_range[0]) + ti_range[0])  # ti
 
         else:
             lower, upper = ws_range[0], ws_range[1]
             s = 1e-9
             mu, sigma = 3, 8
-            xx = stats.truncnorm(
-                (lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma
-            )
+            xx = stats.truncnorm((lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma)
             xs = xx.rvs(n)
             yy = 2 ** (1 / (xs + s) / 6) - 0.9
 
@@ -130,16 +114,9 @@ class wakeNet(nn.Module):
                 rs.append(-0.01 + random.random() * 0.02)
             ys = 2 ** (1 / (xs + s) / 6) - 0.9 + rs * (1 + 60 * (yy - 0.1))
 
-        # # Plot weather data
-        # plt.plot(x, y, c='k')
-        # plt.xlim(0, 12)
-        # plt.ylim(0, 1)
-        # plt.scatter(xs, ys, s=np.array([0.1]*n))
-        # plt.show()
-
         return xs, ys
 
-    def forward(self, X, point):
+    def forward(self, X):
         """
         Performs a forward step during training.
 
@@ -152,22 +129,19 @@ class wakeNet(nn.Module):
         """
 
         X = X.to(device)
-        if train_net == 0:
-            X = X.view(1, -1)
-        X = self.fc15(self.act(self.fc1[point](X)))
-        # X = self.drop(X)  # dropout (unused)
 
         if train_net == 0:
             X = X.view(1, -1)
-        X = self.fc25(self.act(self.fc2[point](X)))
-        # X = self.drop(X)  # dropout (unused)
+        X = self.fc1(X)
+        X = self.act(X)
+        X = self.fcb1(X)
 
-        # if train_net == 0:
-        #     X = X.view(1, -1)
-        # X = self.fc25_(self.act(self.fc2_[point](X)))
-        # # X = self.drop(X)  # dropout (unused)
-
-        out = self.act2(self.fc3[point](X))
+        if train_net == 0:
+            X = X.view(1, -1)
+        X = self.fc2(X)
+        X = self.act(X)
+        X = self.fcb2(X)
+        out = self.act2(self.fc3(X))
 
         return out
 
@@ -177,7 +151,6 @@ class wakeNet(nn.Module):
     def compareContour(
         self,
         u_stream,
-        points,
         ws,
         ti_ar,
         yw,
@@ -191,7 +164,6 @@ class wakeNet(nn.Module):
 
         Args:
             u_stream (torch float array) Inputs of training step.
-            points (int): Number of individual sub-network to be trained.
             ws (float) Wind speed.
             ti (float) Turbulence intensity.
             yw (float) Yaw angle.
@@ -208,40 +180,20 @@ class wakeNet(nn.Module):
 
             final (2D numpy float array) Wake profile with u_stream background velocity.
         """
-        yw = np.array(yw)
+
+        tmp = yw
+        yw = np.zeros(1)
+        yw[0] = tmp
         hb = np.array(hb)
 
-        # Random Dataset
-        speeds, tis = self.tiVsVel(data_size)
-        np.random.seed(51)
-        yws = (np.random.rand(data_size) - 0.5) * (
-            yw_range[1] - yw_range[0]
-        )  # hub yaw angles
-        np.random.seed(256)
-        hbs = (
-            np.random.rand(data_size) * (hb_range[1] - hb_range[0]) + hb_range[0]
-        )  # height slice
-
-        # Keep mean and std of data to normalise later
-        smean, tmean, ymean, hmean = (
-            np.mean(speeds),
-            np.mean(tis),
-            np.mean(yws),
-            np.mean(hbs),
-        )
-        sstd, tstd, ystd, hstd = np.std(speeds), np.std(tis), np.std(yws), np.std(hbs)
-
         ti = ti_ar[0]
-
         if timings == True or result_plots == True:
 
             t0 = time.time()
 
             # Set Floris parameters
-
             if curl == True:
                 fi.floris.farm.set_wake_model("curl")  # curl model
-
             if inputs == 1:
                 fi.reinitialize_flow_field(wind_speed=ws)
                 fi.calculate_wake()
@@ -252,10 +204,7 @@ class wakeNet(nn.Module):
             if inputs == 3:
                 fi.reinitialize_flow_field(wind_speed=ws)
                 fi.reinitialize_flow_field(turbulence_intensity=ti)
-                # fi.change_turbine([0],{'yaw_angle':yw})
                 fi.calculate_wake(yaw_angles=yw)
-
-            # fi.calculate_wake()
 
             if inputs == 4:
                 fi.reinitialize_flow_field(wind_speed=ws)
@@ -277,28 +226,22 @@ class wakeNet(nn.Module):
                     y_bounds=y_bounds,
                 )
 
-            # Keep numpy array of computational plane
             u_mesh = cut_plane.df.u.values.reshape(
-                cut_plane.resolution[1], cut_plane.resolution[0]
+                dimy, dimx
             )
             t1 = time.time()
             # Get analytical model timing
             gauss_time = t1 - t0
             # Keep min value for plotting
             vmin = np.min(u_mesh)
+            vmax = np.max(u_mesh)
 
         # Initialise model for evaluation
-        model.eval()
+        model.eval().to(device)
         t0 = time.time()
         # Initialise neural output vector
         neural = np.zeros(dimx * dimy)
         ti = ti_ar[1]
-
-        # # Standardisation
-        # speed_norm = (ws-smean)/sstd
-        # ti_norm = (ti - tmean)/tstd
-        # yw_norm = (yw - ymean)/ystd
-        # hbs_norm = (hb - hmean)/hstd
 
         # Normalisation
         speed_norm = ((ws - ws_range[0]) / (ws_range[1] - ws_range[0]) - 0.5) * 3
@@ -318,11 +261,8 @@ class wakeNet(nn.Module):
                 ([speed_norm, ti_norm, yw_norm, hbs_norm]), dtype=torch.float
             )
 
-        # Get DNN result as a 1D vector
-        for ii in range(rows):
-            neural[ii * out_piece : out_piece * (ii + 1)] = (
-                self.forward(inpt, ii).detach().cpu().numpy()
-            )
+        model.eval().to(device)
+        neural = model(inpt).detach().cpu().numpy()
 
         # Apply Filter to replace backround with u_stream (helps with scattering)
         if fltr < 1.0:
@@ -364,32 +304,23 @@ class wakeNet(nn.Module):
         if timings == True or result_plots == True:
 
             if result_plots == True:
-                # cmap = None
-                # cmap = 'gnuplot'
-                # cmap = 'viridis'
                 cmap = "coolwarm"
-
-                sizeOfFont = 11
-                fontProperties = {
-                    "family": "serif",
-                    "weight": "normal",
-                    "size": sizeOfFont,
-                }
 
                 fig, axs = plt.subplots(2)
                 fig.suptitle("Velocities(m/s): Analytical (top), Neural (bot)")
                 im1 = axs[0].imshow(
                     u_mesh,
                     vmin=vmin,
+                    vmax=vmax,
                     cmap=cmap,
                     extent=[x_bounds[0], x_bounds[1], y_bounds[0], y_bounds[1]],
                 )
 
                 fig.colorbar(im1, ax=axs[0])
-                # neural = np.kron(neural, np.ones((int(200/dim), int(200/dim))))
                 im2 = axs[1].imshow(
                     neural,
                     vmin=vmin,
+                    vmax=vmax,
                     interpolation=None,
                     cmap=cmap,
                     extent=[x_bounds[0], x_bounds[1], y_bounds[0], y_bounds[1]],
@@ -397,8 +328,6 @@ class wakeNet(nn.Module):
 
                 fig.colorbar(im2, ax=axs[1])
 
-                axs[1].set_xticklabels(axs[1].get_xticks().astype(int), fontProperties)
-                axs[0].set_xticklabels(axs[0].get_xticks().astype(int), fontProperties)
                 plt.show()
 
             max_val = np.max(u_mesh)
@@ -415,21 +344,38 @@ class wakeNet(nn.Module):
                     (np.abs(u_mesh - neural) / max_val * 100),
                     vmax=20,
                     extent=[x_bounds[0], x_bounds[1], y_bounds[0], y_bounds[1]],
+                    cmap=cmap,
                 )
                 plt.colorbar()
                 plt.title("Abs difference")
                 plt.show()
 
-        final = np.copy(neural)
+                # ----- Y-Transect plots ----- #
+                dx = 6.048
+                tlist = np.array([3*D/dx, 6.5*D/dx, 10*D/dx]).astype(int)
+                transects = tlist.size  # defines the number of transects
+                fig, axs = plt.subplots(1, transects, sharey=False)
+                cnt = 0
+                for indx in tlist:
 
+                    yy1 = u_mesh[:, indx]  # FLORIS transect
+                    yy2 = neural[:, indx]  # CNN transect
+                    axs[cnt].plot(
+                        np.flip(yy1, axis=0),
+                        np.arange(u_mesh.shape[0]),
+                        color="navy",
+                        linestyle="--",
+                    )
+                    axs[cnt].plot(
+                        np.flip(yy2, axis=0), np.arange(u_mesh.shape[0]), color="crimson"
+                    )
+                    axs[cnt].title.set_text(str(int(indx * dx)))
+                    cnt += 1
+                plt.show()
+
+        final = np.copy(neural)
         # Replace current turbine inlet speed (ws) with farm u_stream (for superimposed wakes)
         final[final == ws] = u_stream
-
-        if result_plots == 1:
-            plt.imshow(
-                final, extent=[x_bounds[0], x_bounds[1], y_bounds[0], y_bounds[1]]
-            )
-            plt.show()
 
         if timings == True:
             return gauss_time, neural_time, error

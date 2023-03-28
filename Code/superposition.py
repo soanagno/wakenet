@@ -1,5 +1,5 @@
+from re import S
 from neuralWake import *
-from torch import cpu
 from torch import cpu
 from CNNWake.FCC_model import *
 
@@ -8,22 +8,40 @@ warnings.filterwarnings("ignore")
 # Synth value
 if train_net == 0:
     # Load model
-    model = torch.load(weights_path)
-    model.eval()
-
-# Define device
-device = "cpu"
-
+    model = wakeNet().to(device)
+    model.load_state_dict(torch.load(weights_path, map_location=device))
+    model.eval().to(device)
 # Use CNNWake module to calculate local ti values
-local_ti = True
 # Initialise network to local turbulent intensities
 nr_input_values = 42  # Number of input values
+nr_neurons_ti = 200  # Number of neurons in every layer
 nr_neurons = 300  # Number of neurons in every layer
 nr_output = 1  # Number of outputs from model
-TI_model = FCNN(nr_input_values, nr_neurons, nr_output).to(device)
-# Load trained model and set it to evaluation mode
-TI_model.load_model("CNNWake/FCNN_TI.pt", device=device)
-TI_model.eval()
+# Use CNNWake module to calculate local power and ti values
+if local_ti == True:
+    TI_model = FCNN(nr_input_values, nr_neurons_ti, nr_output).to(device)
+    # Load trained model and set it to evaluation mode
+    TI_model.load_model("CNNWake/FCNN_TI.pt", device=device)
+    TI_model.eval()
+if local_pw == True:
+    pw_model = FCNN(nr_input_values, nr_neurons, nr_output).to(device)
+    # Load trained model and set it to evaluation mode
+    pw_model.load_model("CNNWake/power_model.pt", device=device)
+    pw_model.eval()
+
+
+def florisPw(u_stream, tis, xs, ys, yws):
+    # Initialise FLORIS for initial configuraiton
+    if curl == True:
+        fi.floris.farm.set_wake_model("curl")
+    fi.reinitialize_flow_field(wind_speed=u_stream)
+    fi.reinitialize_flow_field(turbulence_intensity=tis)
+    fi.reinitialize_flow_field(layout_array=[xs, ys])
+    fi.calculate_wake(yaw_angles=yws)
+    # Get initial FLORIS power
+    floris_power_0 = fi.get_farm_power()
+
+    return round(floris_power_0, 2)
 
 
 def superposition(
@@ -41,6 +59,7 @@ def superposition(
     floris_gain=False,
     x0=np.zeros(1),
     single=False,
+    saveas=None,
 ):
     """
     Calls the neural model to produce neural wakes and superimposes them on the
@@ -74,6 +93,11 @@ def superposition(
         floris_power_opt (float) Total farm power output produced by Floris in MW,
             based on the input turine yaws and positions.
     """
+
+    # Local pw
+    pw_ar = []
+    # Scales final domain
+    xscale = 0.7
 
     if curl == True:
         fi.floris.farm.set_wake_model("curl")
@@ -109,159 +133,131 @@ def superposition(
     yws = yws[xs_arg]
 
     # Initialisations
-    hbs = 90  # Hub height
+    n = xs.size             # Turbine number
+    clean = np.zeros(n)
+    if n == 1: single = True
+    hbs = 90                # Hub height
     inlet_speed = u_stream  # Speed at inlet
 
     # Domain dimensions
-    y_domain = y_bounds[1] - y_bounds[0]
     x_domain = x_bounds[1] - x_bounds[0]
+    y_domain = y_bounds[1] - y_bounds[0]
 
     # Hub speeds and Yaws' initialization
-    hub_speeds = np.zeros(xs.size)
-    hub_speeds_power = np.zeros(xs.size)
-    hub_speeds_mean = np.zeros(xs.size)
-    # print('YWS', yws)
+    hub_speeds = np.zeros(n)
+    hub_speeds_power = np.zeros(n)
+    hub_speeds_mean = np.zeros(n)
 
-    dx = dimx / x_domain
-    dy = dimy / y_domain
+    # Define dx, dy
+    dx = np.abs(x_domain / dimx)
+    dy = np.abs(y_domain / dimy)
 
-    length = x_domain + np.max(np.abs(xs))
-
-    domain_cols = int(length * dimx / x_domain + 0.5)
-
-    height = y_domain + 2 * np.abs(np.max(np.abs(ys)))
-    domain_rows = int(height * dimy / y_domain + 0.5)
-
-    dx = domain_cols / length
-    dy = domain_rows / height
+    # Domain dimensions
+    length = np.max(np.abs(xs)) + x_domain
+    domain_cols = int(length / dx + .5)
+    height = 2 * np.max(np.abs(ys)) + y_domain
+    domain_rows = int(height / dy + .5)
 
     # Domain shape initialization
     domain = np.ones((domain_rows, domain_cols)) * inlet_speed
+    neural_old = np.ones((dimy, dimx)) * inlet_speed
 
     # Calculate the position of the first wake in the domain.
-    p = 0
-    rows1 = int(domain_rows / 2 - dy * ys[p] - dimy / 2 + 0.5)
-    rows2 = int(domain_rows / 2 - dy * ys[p] + dimy / 2 + 0.5)
-    cols1 = int(dx * xs[p] + 0.5)
-    cols2 = int(dx * xs[p] + 0.5) + dimx
+    rows1 = int(domain_rows / 2 - ys[0] / dy - dimy / 2 + .5)
+    rows2 = int(domain_rows / 2 - ys[0] / dy + dimy / 2 + .5)
+    cols1 = int(xs[0] / dx + .5)
+    cols2 = int(xs[0] / dx + .5) + dimx
 
     # Start DNN timer
     t0 = time.time()
-    neural_old = np.ones((dimy, dimx)) * inlet_speed
-
-    for p in range(xs.size):
+    for p in range(n):
 
         # Define start and finish rows of the current turbine's hub
-        hub_start = int((rows2 + rows1) / 2 - dy * D / 2 - 0.5)
-        hub_finish = int((rows2 + rows1) / 2 + dy * D / 2 + 0.5)
+        hub_start = int((rows2 + rows1) / 2 - D / dy / 2 + .5)
+        hub_finish = int((rows2 + rows1) / 2 + D / dy / 2 + .5)
         hub_tot = hub_finish - hub_start
-
+        if np.all(domain[hub_start:hub_finish, cols1] == u_stream):
+            clean[p] = 1
+        
         # Method A (mean). Calculate the mean speed on the hub.
         inlet_speed_mean = np.mean(domain[hub_start:hub_finish, cols1])
-
         # Method B (rings). Numerically integrate over the rotor swept area surface.
         # This gives a better approximation to the 3D domain calculations of Floris.
-        area = np.pi * D * D / 4
-        # area = 0
         inlet_speed = 0
-        inlet_speed_power = 0
-
-        hub_tot -= 1
-        for ii in range(int(hub_tot / 2)):
-
+        inlet_speed_pw = 0
+        area = np.pi * D * D / 4
+        for i in range(int(hub_tot / 2)):
+            # Stop calculation if the profile == u_stream
+            if clean[p] == 1:
+                break
             # Find mean ring speed assuming symmetric flow with respect to the tower.
-            mean_hub_speed = np.mean(
-                [domain[hub_start + ii, cols1], domain[hub_finish - ii, cols1]]
-            )
-
+            mean_hub_speed = np.mean([domain[hub_start + i, cols1], domain[hub_finish - i, cols1]])
             # # Calculate total rotor area.
-            # area += 2 * np.pi * int((hub_tot/2-ii)/dy) * 1/dy
-
+            # area += 2 * np.pi * int((hub_tot/2-i)*dy) * dy
             # Calculate inlet speed of current turbine based on the current state of the domain.
-            inlet_speed += (
-                mean_hub_speed * 2 * np.pi * (int(hub_tot / 2) - ii) / dy * 1 / dy
-            )
-
-            # Calculate speed^3 (kinetic energy) term that will go in the calculation of power.
-            area_int = 2 * np.pi * (int(hub_tot / 2) - ii) / dy * 1 / dy
-            inlet_speed_power += (
-                mean_hub_speed * mean_hub_speed * mean_hub_speed * area_int
-            )
+            inlet_speed += (mean_hub_speed * 2 * np.pi * (int(hub_tot / 2) - i) * dy * dy)
+            if local_pw != True:
+                # Calculate speed^3 (kinetic energy) term that will go in the calculation of power.
+                area_int = 2 * np.pi * (int(hub_tot / 2) - i) * dy * dy
+                inlet_speed_pw += (mean_hub_speed * mean_hub_speed * mean_hub_speed * area_int)
 
         # Divide speeds by total calculated area
         inlet_speed /= area
-        inlet_speed_power /= area
-        inlet_speed_power = (inlet_speed_power) ** (1 / 3)
+        inlet_speed_pw /= area
+        inlet_speed_pw = (inlet_speed_pw) ** (1 / 3)
+
+        # Profile == u_stream or Single wake condition
+        if clean[p] == 1 or single == True:
+            inlet_speed = u_stream
+            inlet_speed_pw = u_stream
 
         # Limit the minimum speed at the minimum training speed of the DNN.
         if inlet_speed < ws_range[0]:
             inlet_speed = ws_range[0]
 
-        # Single wake condition
-        if single == True:
-            inlet_speed_power = u_stream
-
-        # if p == 0 or p == 1:
-        #     inlet_speed_power = inlet_speed
-
-        ti_ar = np.zeros(2)
-        ti_ar[1] = tis
-
-        # Use CNNWake module to calclate local ti values for each turbine
-        if local_ti == True:
-
-            speeds_50m = domain[hub_start:hub_finish, cols1 - int(50 * dx + 0.5)]  # ***
+        # Use CNNWake module to calculate local ti values for each turbine
+        ti_ar = np.ones(2)*tis
+        if local_ti == True or local_pw == True:
+            speeds_50m = domain[hub_start:hub_finish, cols1 - int(50 / dx + .5)]  # ***
             sss = speeds_50m.size
-            lsp = np.arange(sss)
-            ult = interp(np.linspace(0, sss, 40), lsp, speeds_50m)
-
+            ult = np.array([((speeds_50m[i - 1] + speeds_50m[i] + speeds_50m[i + 1])/3) 
+                   for i in np.linspace(1, sss-2, 40, dtype=int)])
             yaw_angle = yws[p]
             turbulent_int = tis
-            # u = [inlet_speed / 12] * 42
-            ult /= 12
+            ult /= 15
             # The array conists of 40 wind speeds values, the yaw angle and inflow TI
             # change the two last values of the array to yaw angle and inflow TI b4 passing to NN
-            ult = np.append(ult, yaw_angle / 30)
+            ult = np.append(ult, yaw_angle / 35)
             ult = np.append(ult, turbulent_int)
-
+        if local_ti == True and clean[p] != 1:# and curl != 1:
             ti_norm = 0.3
-            ti2 = (
-                TI_model((torch.tensor(ult).float().to(device))).detach().cpu().numpy()
-                * ti_norm
-            )
+            ti2 = (TI_model((torch.tensor(ult).float().to(device))).detach().cpu().numpy() * ti_norm)
             if ti2 < turbulent_int * 0.7:
                 ti2 = turbulent_int * 1.5
             # clip ti values to max and min trained
-            ti_ar[1] = np.clip(ti2, 0.015, 0.25).item(0)
-
-        ti_ar[0] = tis
-        if (
-            np.all(speeds_50m > u_stream * 0.95) and np.abs(yws[p]) < 30 * 0.05
-        ):  # yws in degrees
-            ti_ar[1] = tis
+            ti_ar[1] = np.clip(ti2, 0.01, 0.25).item(0)
+            ti_ar[0] = tis
+        if local_pw == True:
+            pw_norm = 4996386
+            pw = (pw_model((torch.tensor(ult).float().to(device))).detach().cpu().numpy() * pw_norm)
+            pw_ar.append(pw)
 
         # Get the DNN result
+        # print(u_stream, inlet_speed, ti_ar, yws[p], hbs)
         neural = model.compareContour(
-            u_stream, ref_point, inlet_speed, ti_ar, -yws[p], hbs, model
+            u_stream, inlet_speed, ti_ar, yws[p], hbs, model, result_plots=False
         )
-
+        
         # Save the inlet speed terms
         hub_speeds[p] = inlet_speed
         hub_speeds_mean[p] = inlet_speed_mean
-        hub_speeds_power[p] = inlet_speed_power
+        hub_speeds_power[p] = inlet_speed_pw
 
         # Apply SOS for after the first turbine is placed in the domain
-        # if p != 0 and p != (xs.size):
-        if p != (xs.size):
-
-            # Filter out wakes
-            neural[neural == u_stream] = hub_speeds[p]
-            neural_old[neural_old == u_stream] = u_stream
-
+        if p != 0 and p != (xs.size):
             # Apply the SOS superposition model
             def1 = np.square(1 - neural / hub_speeds[p])
             def2 = np.square(1 - neural_old / u_stream)
-
             neural = (1 - np.sqrt(def1 + def2)) * u_stream
 
         # Apply denoise filter (mainly for plotting purposes)
@@ -276,11 +272,10 @@ def superposition(
         # Calculate the rows and columns of the next wake inside the domain
         if p != (xs.size - 1):
             p2 = p + 1
-            rows1 = int(domain_rows / 2 - dy * ys[p2] - dimy / 2 + 0.5)
-            rows2 = int(domain_rows / 2 - dy * ys[p2] + dimy / 2 + 0.5)
-            cols1 = int(dx * xs[p2] + 0.5)
-            cols2 = int(dx * xs[p2] + 0.5) + dimx
-
+            rows1 = int(domain_rows / 2 - ys[p2] / dy - dimy / 2 + .5)
+            rows2 = int(domain_rows / 2 - ys[p2] / dy + dimy / 2 + .5)
+            cols1 = int(xs[p2] / dx + .5)
+            cols2 = int(xs[p2] / dx + .5) + dimx
             # Store an old image of the domain to be used in the next superposition
             neural_old = np.copy(domain[rows1:rows2, cols1:cols2])
 
@@ -304,98 +299,99 @@ def superposition(
             fi.floris.farm.set_wake_model("curl")
         fi.reinitialize_flow_field(wind_speed=u_stream)
         fi.reinitialize_flow_field(turbulence_intensity=tis)
-        fi.reinitialize_flow_field(layout_array=[xs, ys])
+        if single != True:
+            fi.reinitialize_flow_field(layout_array=[xs, -ys])
 
+        # Get FLORIS power
         if timings == False:
             fi.calculate_wake(yaw_angles=yaw_ini)
             floris_power_0 = fi.get_farm_power()
-
         fi.calculate_wake(yaw_angles=yws)
         floris_power_opt = fi.get_farm_power()
 
-        cut_plane = fi.get_hor_plane(
-            height=hbs,
-            x_bounds=(0, length),
-            y_bounds=(int(-height / 2 - 0.5), int(height / 2 + 0.5)),
-            x_resolution=domain_cols,
-            y_resolution=domain_rows,
-        )
+        if plots == True:
+            nocut=0
+        else:
+            nocut=1
+        if nocut != 1:
+            if single == True:
+                print('SINGLE')
+                cut_plane = fi.get_hor_plane(height=hbs,
+                                            x_bounds=x_bounds,
+                                            y_bounds=y_bounds,
+                                            x_resolution=dimx,
+                                            y_resolution=dimy)
+            else:
+                cut_plane = fi.get_hor_plane(height=hbs,
+                                            x_bounds=(0, length+0.5*dx),
+                                            y_bounds=(-height/2, height/2),
+                                            x_resolution=domain_cols,
+                                            y_resolution=domain_rows)
 
-        u_mesh = cut_plane.df.u.values.reshape(
-            cut_plane.resolution[1], cut_plane.resolution[0]
-        )
+            u_mesh0 = cut_plane.df.u.values.reshape(
+                cut_plane.resolution[1], cut_plane.resolution[0]
+            )
+            if single == True:
+                u_mesh = np.ones((domain_rows, domain_cols)) * inlet_speed
+                u_mesh[rows1:rows2, cols1:cols2] = u_mesh0
+            else:
+                u_mesh = u_mesh0
 
         # End FLORIS timer
         t1 = time.time()
-
-        # Print FLORIS time
         floris_time = t1 - t0
         floris_time_rnd = round(t1 - t0, 2)
         if print_times == True:
             print("Total Floris time: ", floris_time_rnd)
-
         if timings == True:
-            # if timings == True return the calculation timings.
-
             return floris_time, neural_time
 
         # Define plot length and height
-
-        row_start = int(domain.shape[0] / 2 - np.max(ys) * dy - 2 * D * dy + 1)
-        row_finish = int(domain.shape[0] / 2 - np.min(ys) * dy + 2 * D * dy)
-
-        new_height1 = np.min(ys) - 2 * D - 0.5
-        new_height2 = np.max(ys) + 2 * D + 0.5
-
-        if xs.size == 1:
-            new_len = length
-        else:
-            new_len = length - int(x_domain / 2 + 0.5)
-
-        col_start = 0
-        col_finish = int(domain.shape[1] * new_len / length + 0.5)
-
-        # Flip u_mesh
-        u_mesh = np.flipud(u_mesh)
+        fx = cut_plane.df.x1.values
+        new_len = np.max(fx) - np.min(fx)
+        new_height1 = np.min(ys) - 2 * D
+        new_height2 = np.max(ys) + 2 * D
+        row_start = int(domain.shape[0] / 2 - np.max(ys) / dy - 2 * D / dy + .0)
+        row_finish = int(domain.shape[0] / 2 - np.min(ys) / dy + 2 * D / dy + .5)
+        # Keep the FLORIS and DNN domains to be plotted
+        u_mesh = u_mesh[row_start:row_finish, :]
+        domain_final = domain[row_start:row_finish, :]
+        # domain_final = domain
 
         # Keep min and max velocities of FLORIS domain
         vmin = np.min(u_mesh)
         vmax = np.max(u_mesh)
 
-        # Keep the FLORIS and DNN domains to be plotted
-        domain_final = domain[row_start:row_finish, col_start : col_start + 750]
-        u_mesh = u_mesh[row_start:row_finish, col_start : col_start + 750]
+
+        if u_mesh.shape != domain_final.shape:
+            print("Error: unequal domain shapes!")
+
         # Set figure properties
         fig, axs = plt.subplots(3, sharex=False)
         cmap = "coolwarm"
-        fontProperties = {"family": "serif", "weight": "normal", "size": 11}
-
-        contourss = False  # if True, plots contours on top of wakes.
 
         # ----- FLORIS wake plots ----- #
-        if contourss == True:
+        if contours_on == True:
             X, Y = np.meshgrid(
                 np.linspace(0, new_len, u_mesh.shape[1]),
-                np.linspace(new_height1, new_height2, u_mesh.shape[0]),
+                np.linspace(new_height2, new_height1, u_mesh.shape[0]),
             )
-            contours = axs[0].contour(X, Y, u_mesh, 1, colors="white")
-            axs[0].clabel(contours, inline=True, fontsize=8)
+            contours = axs[0].contour(X, Y, u_mesh, 4, alpha=0.5, linewidths=0.5, colors="white")
+            axs[0].clabel(contours, inline=False, fontsize=1)
 
         im1 = axs[0].imshow(
-            u_mesh,
-            vmin=vmin,
+            u_mesh[:, :int(xscale*u_mesh.shape[1])],
+            vmin=vmin+1.25,
             vmax=vmax,
             cmap=cmap,
-            extent=[0, new_len, new_height1, new_height2],
+            extent=[0, new_len*xscale, new_height1, new_height2],
         )
-        axs[0].set_yticklabels(
-            np.flipud(axs[0].get_yticks().astype(int)), fontProperties
-        )
-        axs[0].set_xticklabels(axs[0].get_xticks().astype(int), fontProperties)
         fig.colorbar(im1, ax=axs[0])
+        axs[0].tick_params(axis="x", direction="in")
+        axs[0].tick_params(axis="y", direction="in", length=0)
 
         # ----- DNN wake plots ----- #
-        if contourss == True:
+        if contours_on == True:
             X, Y = np.meshgrid(
                 np.linspace(0, new_len, domain_final.shape[1]),
                 np.linspace(new_height2, new_height1, domain_final.shape[0]),
@@ -404,45 +400,48 @@ def superposition(
             axs[1].clabel(contours, inline=True, fontsize=8)
 
         im2 = axs[1].imshow(
-            domain_final,
-            vmin=vmin,
+            domain_final[:, :int(xscale*domain_final.shape[1])],
+            vmin=vmin+1.25,
             vmax=vmax,
             cmap=cmap,
-            extent=[0, new_len, new_height1, new_height2],
+            extent=[0, new_len*xscale, new_height1, new_height2],
         )
-        axs[1].set_xticklabels(axs[1].get_xticks().astype(int), fontProperties)
-        axs[1].set_yticklabels(axs[1].get_yticks().astype(int), fontProperties)
         fig.colorbar(im2, ax=axs[1])
+        axs[1].tick_params(axis="x", direction="in")
+        axs[1].tick_params(axis="y", direction="in", length=0)
 
         # ----- ERROR (%) plots ----- #
         max_val = np.max(u_mesh)
         im3 = axs[2].imshow(
-            (np.abs(u_mesh - domain_final) / max_val * 100),
+            (np.abs(u_mesh - domain_final) / max_val * 100)[:, :int(xscale*domain_final.shape[1])],
             cmap=cmap,
-            extent=[0, new_len, new_height1, new_height2],
+            extent=[0, new_len*xscale, new_height1, new_height2],
             vmax=20,
         )
+        axs[2].tick_params(axis="x", direction="in")
+        axs[2].tick_params(axis="y", direction="in", length=0)
         plt.colorbar(im3, ax=axs[2])
-        plt.show()
+
+        if saveas != None:
+            fig.savefig("figures/"+str(saveas), dpi=1200)
+        else:
+            plt.show()
 
         absdifsum = np.sum(np.abs(u_mesh - domain_final))
         error = round(1 / (dimx * dimy) * absdifsum / max_val * 100, 2)
         print("Abs mean error (%): ", error)
-        plt.show()
 
         # ----- Y-Transect plots ----- #
-        fig, axs = plt.subplots(1, 3, sharey=False)
-
+        mindx = np.min(xs)/dx+0.5
+        mindx = int(mindx)
+        tlist = mindx + np.array([3*D/dx, 6.5*D/dx, 10*D/dx]).astype(int)
+        transects = tlist.size  # defines the number of transects
+        fig, axs = plt.subplots(1, transects, sharey=False)
         cnt = 0
-        transects = 3  # defines the number of transects
-        step = int(
-            u_mesh.shape[1] / (transects + 2)
-        )  # step between the downstream transects
-        for indx in range(step, u_mesh.shape[1] - 2 * step + 1, step):
+        for indx in tlist:
 
             yy1 = u_mesh[:, indx]  # FLORIS transect
             yy2 = domain_final[:, indx]  # CNN transect
-
             axs[cnt].plot(
                 np.flip(yy1, axis=0),
                 np.arange(u_mesh.shape[0]),
@@ -452,48 +451,42 @@ def superposition(
             axs[cnt].plot(
                 np.flip(yy2, axis=0), np.arange(u_mesh.shape[0]), color="crimson"
             )
-            axs[cnt].set_xticklabels(
-                np.flipud(axs[cnt].get_xticks().astype(int)), fontProperties
-            )
-            axs[cnt].set_yticklabels([], fontProperties)
-            axs[cnt].title.set_text(str(int(indx / dx)))
-            # axs[cnt].set_yticklabels((np.ones(2)*indx/dx).astype(int), fontProperties)
-            # axs[cnt].set_xticklabels(np.arange((u_mesh.shape[0])/dy).astype(int), fontProperties)
-
-            axs[cnt].tick_params(axis="x", direction="in")
-            axs[cnt].tick_params(axis="y", direction="in", length=0)
+            axs[cnt].title.set_text(str(int(indx * dx)))
             cnt += 1
 
-        plt.show()
+        if saveas != None:
+            fig.savefig("figures/"+str(saveas)+"yt", dpi=1200)
+        else:
+            plt.show()
 
     if power_opt == True:
 
         # Calculation of total farm power
 
-        rho = 1.225  # air density
-        # hub_speeds_old = np.copy(hub_speeds)
-        hub_speeds_old = np.copy(hub_speeds_mean)
-        # hub_speeds_old = np.copy(hub_speeds_power)
+        if local_pw == True:
+            power_tot = pw_ar
+        else:
+            rho = 1.225  # air density
+            # hub_speeds_old = np.copy(hub_speeds)
+            # hub_speeds_old = np.copy(hub_speeds_mean)
+            hub_speeds_old = np.copy(hub_speeds_power)
 
-        # Interpolate cp values
-        cp_interp = np.interp(hub_speeds_old, wind_speed, cp)
+            # Interpolate cp values
+            cp_interp = np.interp(hub_speeds_old, wind_speed, cp)
 
-        # Multiply by cos(theta) term
-        # Default exponent of cos term is 1.0.
-        # An exponent of .78 was found to perform best.
-        # cp_interp *= np.cos(np.pi/180*(-yws))**(.78)
-        cp_interp *= np.cos(np.pi / 180 * (-yws)) ** (1.0)
-        # cp_interp *= np.cos(np.pi/180*(-yws))**(1.15)
+            # Multiply by cos(theta) term
+            # Default exponent of cos term is 1.0.
+            # An exponent of .78 was found to perform best.
+            cp_interp *= np.cos(np.pi / 180 * (-yws)) ** (1.3)
 
-        # Calculate powers using the kinetic energy term
-        power_tot = 0.5 * rho * cp_interp * hub_speeds_mean**3 * area
-
+            # Calculate powers using the kinetic energy term
+            power_tot = 0.5 * rho * cp_interp * hub_speeds_power**3 * area
+        
         # Sum of all turbine power outputs
         power_tot = np.sum(power_tot)
 
         if floris_gain == True:
-            # Calculate power gain as provided by FLORIS
-            # (for final assessment of optimisation).
+            # Calculate power gain as provided by FLORIS (for final assessment of optimisation).
 
             # Initialise FLORIS for initial configuraiton
             if curl == True:
@@ -507,28 +500,21 @@ def superposition(
             fi.calculate_wake(yaw_angles=yaw_ini)
             # Get initial FLORIS power
             floris_power_0 = fi.get_farm_power()
-
-            # Initialise FLORIS for optimal configuraiton
-            fi.reinitialize_flow_field(layout_array=[xs, ys])
-            fi.calculate_wake(yaw_angles=yws)
-            # Get optimal FLORIS power
-            floris_power_opt = fi.get_farm_power()
+            floris_power_opt = florisPw(u_stream, tis, xs, ys, yws)
 
             floris_power_gain = round(
                 (floris_power_opt - floris_power_0) / floris_power_0 * 100, 2
             )
 
             if plots == True:
-                print("|-----------------------|")
+                print("----------------FLORIS for Neural--------------------")
                 print("Floris Initial Power", round(floris_power_0 / 1e6, 2), "MW")
                 print("Floris Optimal power", round(floris_power_opt / 1e6, 2), "MW")
                 print("Floris Power Gain (%)", floris_power_gain)
-                print("|-----------------------|")
+                print("-----------------------------------------------------")
 
-            return -power_tot, floris_power_opt / 1e6
+            return -power_tot, floris_power_opt/1e6, floris_power_0/1e6
 
         else:
-            # Calculate power gain as provided by the DNN
-            # (used in optimisation steps).
-
+            # Calculate power gain as provided by the DNN (used in optimisation steps).
             return -power_tot

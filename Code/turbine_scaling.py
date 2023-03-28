@@ -5,7 +5,7 @@ from optimisation import *
 import synth_and_train as dat
 
 
-if synth == 1:
+if train_net == 1:
 
     # Plot wake dataset sample
     dat.Create(plots=True)
@@ -14,68 +14,38 @@ else:
 
     # ------------ Computational time vs Superimposed turbines scaling ------------ #
 
-    xs = np.array(
-        [
-            0,
-            0,
-            0,
-            7 * D,
-            7 * D,
-            7 * D,
-            14 * D,
-            14 * D,
-            14 * D,
-            21 * D,
-            21 * D,
-            21 * D,
-            28 * D,
-            28 * D,
-            28 * D,
-            35 * D,
-            35 * D,
-            35 * D,
-            42 * D,
-            42 * D,
-            42 * D,
-            49 * D,
-            49 * D,
-            49 * D,
-            56 * D,
-        ]
-    )
-    ys = np.array(
-        [
-            0 * D,
-            2 * D,
-            4 * D,
-            1 * D,
-            3 * D,
-            5 * D,
-            0 * D,
-            2 * D,
-            4 * D,
-            1 * D,
-            3 * D,
-            5 * D,
-            0 * D,
-            2 * D,
-            4 * D,
-            1 * D,
-            3 * D,
-            5 * D,
-            0 * D,
-            2 * D,
-            4 * D,
-            1 * D,
-            3 * D,
-            5 * D,
-            0 * D,
-        ]
-    )
-    yws = np.zeros(xs.size)
+    iterations = 3
+    mm = 4
+    max_turbines = 6*mm
+    saveas = "scaling"+str(max_turbines)+" "+device
 
-    iterations = 5
-    max_turbines = 20
+    xs = [
+            0,
+            0,
+            0,
+            7 * D,
+            7 * D,
+            7 * D
+         ]
+
+    ys = [
+            0 * D,
+            2 * D,
+            4 * D,
+            1 * D,
+            3 * D,
+            5 * D
+         ]
+
+    cnt = 2
+    for i in range(int(max_turbines/6+.5)-1):
+        xs += [7*cnt*D, 7*cnt*D, 7*cnt*D] + [7*(cnt+1)*D, 7*(cnt+1)*D, 7*(cnt+1)*D]
+        ys += ys[:6]
+        cnt+=1
+
+    xs = np.array(xs)
+    ys = np.array(ys)
+    yws = np.zeros(xs.size)
 
     floris_time_plot = np.zeros(max_turbines)
     neural_time_plot = np.zeros(max_turbines)
@@ -105,19 +75,17 @@ else:
 
     # plt.plot(np.arange(1, max_turbines+1), floris_time_plot/100, color='navy', linestyle='--')
     plt.plot(
-        np.arange(1, max_turbines + 1), floris_time_plot, color="navy", linestyle="--"
+        np.arange(1, max_turbines + 1), floris_time_plot, color="navy", linestyle="--", label='FLORIS'
     )
-    plt.plot(np.arange(1, max_turbines + 1), neural_time_plot, color="crimson")
+    plt.plot(
+        np.arange(1, max_turbines + 1), neural_time_plot, color="crimson", label='wakeNet'
+    )
     plt.xscale("log")
     plt.yscale("log")
 
-    fontProperties = {"family": "serif", "weight": "normal", "size": 11}
-
     plt.tick_params(axis="x", direction="in")
     plt.tick_params(axis="y", direction="in")
-    # plt.set_aspect(aspect=1.0/plt.get_data_ratio())
 
-    ax.set_xticklabels(ax.get_xticks().astype(int), fontProperties)
-    ax.set_yticklabels(ax.get_yticks(), fontProperties)
-
+    plt.legend()
     plt.show()
+    fig.savefig("figures/"+str(saveas), dpi=1200)

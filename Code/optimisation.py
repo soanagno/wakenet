@@ -13,6 +13,7 @@ def florisOptimiser(
     resy=dimy,
     plots=False,
     mode="yaw",
+    results=True
 ):
     """
     Calls the Floris optimiser to calculate the optimal yaws of a turbine farm.
@@ -35,17 +36,17 @@ def florisOptimiser(
         power_initial (float) Floris initial farm power output in MW.
     """
 
-    print("                      ")
-    print("                      ")
+    print()
+    print()
     print("In FLORIS Optimiser...")
 
     # Instantiate the FLORIS object
     file_dir = os.path.dirname(os.path.abspath(__file__))
     fi = wfct.floris_interface.FlorisInterface(os.path.join(file_dir, file_path))
 
-    # fi.get_farm_power_for_yaw_angle()
-
     # Initialise FLORIS wakefield
+    if curl == True:
+        fi.floris.farm.set_wake_model("curl")
     fi.reinitialize_flow_field(wind_speed=ws)
     fi.reinitialize_flow_field(turbulence_intensity=ti)
     fi.reinitialize_flow_field(layout_array=(layout_x, layout_y))
@@ -54,23 +55,14 @@ def florisOptimiser(
 
     if mode == "yaw":
 
-        # Experimental grid resolution change
-        # xbnds = [0, 1000]
-        # ybnds = [0, 350]
-        # zbnds = [0, 200]
-        # grid_spacing = 10
-        # print(fi.get_flow_data())
-        # exit()
-
         # Start timer
         t0 = time.time()
 
         # Initialize the horizontal cut
-        hor_plane = fi.get_hor_plane(x_resolution=resx, y_resolution=resy)
+        print(resx, resy)
 
         if plots == True:
-
-            # Plot and show
+            hor_plane = fi.get_hor_plane(height=hh, x_resolution=resx, y_resolution=resy)
             fig, ax = plt.subplots()
             wfct.visualization.visualize_cut_plane(hor_plane, ax=ax)
             ax.set_title("Baseline Case")
@@ -80,7 +72,7 @@ def florisOptimiser(
             "disp": True,
             "iprint": 2,
             "ftol": 1e-7,
-            "eps": 0.01,
+            "eps": 0.1,
         }
 
         # Instantiate the Optimization object
@@ -98,37 +90,26 @@ def florisOptimiser(
         fi.calculate_wake(yaw_angles=yaw_angles)
         power_opt = fi.get_farm_power()
 
-        turbine_wind_speeds = [
-            turb.average_velocity for turb in fi.floris.farm.turbines
-        ]
-        print("Floris turb speeds ", turbine_wind_speeds)
-
         # End timer
         t1 = time.time()
 
-        if plots == True:
-
+        if results == True:
             print("==========================================")
             print("Inital Power = ", round(power_initial / 1e6, 2))
             print("Optimized Power = ", round(power_opt / 1e6, 2))
-            print(
-                "Total Power Gain = %.1f%%"
-                % (100 * (power_opt - power_initial) / power_initial)
-            )
+            print("Total Power Gain = %.1f%%" % (100 * (power_opt - power_initial) / power_initial))
             print("Floris Yaws: ", yaw_angles)
             print("==========================================")
-
+        if plots == True:
             # Initialize the horizontal cut
-            hor_plane = fi.get_hor_plane(x_resolution=resx, y_resolution=resy)
-
+            hor_plane = fi.get_hor_plane(height=hh, x_resolution=resx, y_resolution=resy)
             # Plot and show
             fig, ax = plt.subplots()
             wfct.visualization.visualize_cut_plane(hor_plane, ax=ax)
             ax.set_title("Optimal Wake Steering")
             plt.show()
-
         floris_time = round(t1 - t0, 2)
-        print("FLORIS TIME: ", floris_time)
+        print("FLORIS TIME:", floris_time)
 
         return power_opt / 1e6, floris_time, power_initial / 1e6
 
@@ -137,18 +118,16 @@ def florisOptimiser(
         # Define turbine layout
         layout_x = list(layout_x)
         layout_y = list(layout_y)
-
         fi.reinitialize_flow_field(layout_array=(layout_x, layout_y))
 
         if plots == True:
-            hor_plane = fi.get_hor_plane()
+            hor_plane = fi.get_hor_plane(height=hh,)
             fig, ax = plt.subplots()
             wfct.visualization.visualize_cut_plane(hor_plane, ax=ax)
             plt.show()
 
         t0 = time.time()
 
-        # Define the boundaries for the wind farm
         boundaries = [
             [0, 0],
             [0, opt_ybound * D],
@@ -156,14 +135,15 @@ def florisOptimiser(
             [opt_xbound * D, 0],
         ]
 
-        # Generate random wind rose data (single wind direction and wind speed in this study)
-        wd = [270]
-        ws = [ws]
+        # Generate random wind rose data 
+        # (single wind direction and wind speed for this study)
+        wd = np.array([270.0]*1)
+        ws = np.ones(len(wd))*ws
         freq = np.abs(np.sort(np.random.randn(len(wd))))
         freq = freq / freq.sum()
 
         # Set optimization options
-        opt_options = {"maxiter": 50, "disp": True, "iprint": 2, "ftol": 1e-9}
+        opt_options = {"maxiter": 50, "disp": True, "iprint": 2, "ftol": 1e-8}
 
         # Compute initial AEP for optimization normalization
         AEP_initial = fi.get_farm_AEP(wd, ws, freq)
@@ -180,38 +160,36 @@ def florisOptimiser(
         )
 
         # Perform layout optimization
-        layout_results = layout_opt.optimize()
+        try:
+            layout_results = layout_opt.optimize()
+        except:
+            layout_results = [layout_x, layout_y]
+            file1 = open("opt_exeptions.txt", "a")
+            file1.write(str(ws) + ' ' + str(ti) + " \n")
+            file1.close()
+            pass
 
         # Calculate new AEP results
         fi.reinitialize_flow_field(layout_array=(layout_results[0], layout_results[1]))
         AEP_optimized = fi.get_farm_AEP(wd, ws, freq)
         power_opt = fi.get_farm_power()
 
-        if plots == True:
+        if results == True:
             print("=====================================================")
-            print(
-                "Total AEP Gain = %.1f%%"
-                % (100.0 * (AEP_optimized - AEP_initial) / AEP_initial)
-            )
+            print("Total AEP Gain = %.1f%%" % (100.0 * (AEP_optimized - AEP_initial) / AEP_initial))
             print("Floris Initial Power", round(power_initial / 1e6, 2))
             print("Floris Optimal Power", round(power_opt / 1e6, 2))
-            print(
-                "Total Power Gain (%)",
-                round((power_opt - power_initial) / power_initial * 100, 2),
-            )
+            print("Total Power Gain (%)", round((power_opt - power_initial)/power_initial * 100, 2))
+            print("Floris Layout: ", layout_results)
             print("=====================================================")
-
         t1 = time.time()
         floris_time = round(t1 - t0, 2)
-        print("FLORIS TIME: ", floris_time)
-
+        print("FLORIS TIME:", floris_time)
         if plots == True:
-
             # Plot the new layout vs the old layout
             layout_opt.plot_layout_opt_results()
             plt.show()
-
-            hor_plane = fi.get_hor_plane()
+            hor_plane = fi.get_hor_plane(height=hh,)
             fig, ax = plt.subplots()
             wfct.visualization.visualize_cut_plane(hor_plane, ax=ax)
             plt.show()
@@ -219,31 +197,34 @@ def florisOptimiser(
         return power_opt / 1e6, floris_time, power_initial / 1e6
 
 
-def fun(x_in, min_dist):
-    """
-    Used for the constraint definition of the DNN optimiser.
+def _norm(val, x1, x2):
+    return (val - x1) / (x2 - x1)
 
-    Args:
-        x_in (vector of floats) x and y turbine coordinates
-        min_dist (float) minimum distance between turbines
 
-    Returns: 1
-    """
+def _space_constraint(x_in):
+    min_dist = 2.0*D
 
-    nturbs = int(x_in.size / 2 + 0.25)
-    x = x_in[:nturbs]
-    y = x_in[nturbs:]
+    nturbs = int(x_in.size / 2.0 + 0.25)
+    x = np.array(x_in[:nturbs])
+    y = np.array(x_in[nturbs:])
 
-    for jj in range(x.size):
-        for ii in range(jj, x.size):
-            if np.abs(x[ii] - x[jj]) <= min_dist:
-                return 0
+    dist = [
+        np.sqrt((x[i] - x[j]) ** 2 + (y[i] - y[j]) ** 2)
+        for i in range(nturbs)
+        for j in range(nturbs)
+        if i != j
+    ]
 
-    for jj in range(x.size):
-        for ii in range(jj, x.size):
-            if np.abs(y[ii] - y[jj]) <= min_dist:
-                return 0
-    return 1
+    dist = np.array(dist)
+
+    # Normalise boundaries (from Floris)
+    bndx_min = 0.0
+    bndx_max = (opt_xbound+1.0)*D
+
+    an = _norm(np.min(dist), bndx_min, bndx_max)
+    bn = _norm(min_dist, bndx_min, bndx_max)
+
+    return an - bn
 
 
 def neuralOptimiser(
@@ -257,6 +238,7 @@ def neuralOptimiser(
     plots_ini=False,
     floris_gain=False,
     mode="yaw",
+    results=True
 ):
 
     """
@@ -280,8 +262,8 @@ def neuralOptimiser(
         neural_time (float) Neural Network optimisation time in seconds.
     """
 
-    print("                      ")
-    print("                      ")
+    print()
+    print()
     print("In NEURAL Optimiser...")
 
     layout = np.concatenate((xs, ys), axis=0)
@@ -305,7 +287,7 @@ def neuralOptimiser(
             "maxiter": 100,
             "disp": True,
             "ftol": 1e-7,
-            "eps": 0.01,
+            "eps": 0.1,
         }
 
         # Set initial yaws
@@ -323,15 +305,10 @@ def neuralOptimiser(
             bounds=bnds,
             options=opt_options,
         )
-        print("out")
         t1 = time.time()
-
         neural_time = round(t1 - t0, 2)
 
-        # optimal, floris_power_gain = superposition(res.x, u_stream=ws, tis=ti, xs=xs, ys=ys,
-        #                                            cp=cp, wind_speed=wind_speed, plots=plots,
-        #                                            power_opt=True, floris_gain=floris_gain)
-        optimal, floris_power_opt = superposition(
+        optimal, floris_power_opt, floris_power_0 = superposition(
             res.x,
             layout,
             u_stream=ws,
@@ -343,60 +320,37 @@ def neuralOptimiser(
             floris_gain=floris_gain,
         )
 
-        if plots == True:
-
-            print("|-----------------------|")
-            print("Neural Initial Power", round(power_ini / 1e6, 2), "MW")
-            print("Neural Optimal Power", round(-optimal / 1e6, 2), "MW")
-            print(
-                "Neural Power Gain (%)",
-                round((np.abs(optimal) - power_ini) / power_ini * 100, 2),
-            )
-            print("|-----------------------|")
+        if results == True:
+            print("-----------------------------------------------------")
+            print("Floris Initial Power", round(floris_power_0, 2), "MW")
+            print("Floris Optimal Power", round(floris_power_opt, 2), "MW")
+            print("Floris Power Gain (%)", round((np.abs(floris_power_opt) - floris_power_0)/floris_power_0 * 100, 2))
             print("Neural Yaws:", np.round(res.x, 2))
+            print("-----------------------------------------------------")
+        print("NEURAL TIME:", neural_time)
 
-        print("NEURAL TIME: ", neural_time)
-
-        return floris_power_opt, neural_time
+        return floris_power_opt, neural_time, floris_power_0
 
     elif mode == "farm":
 
         farm_opt = True
         x0 = np.copy(layout)  # Save initial layout positions
 
-        # Calculate initial power
-        power_ini = -superposition(
-            x0,
-            np.zeros(xs.size),
-            u_stream=ws,
-            tis=ti,
-            cp=cp,
-            wind_speed=wind_speed,
-            farm_opt=farm_opt,
-            plots=plots_ini,
-            power_opt=True,
-        )
-
         # Define minimum distance between turbines
-        min_dist = 2 * D
+        min_dist = 2.0 * D
         tmp1 = {
             "type": "ineq",
-            "fun": lambda x, *args: fun(x, min_dist),
+            "fun": lambda x, *args: _space_constraint(x, min_dist),
             "args": (min_dist,),
         }
+        con = {'type': 'ineq', 'fun': _space_constraint}
 
         # Optimiser options
-        opt_options = {
-            "maxiter": 50,
-            "disp": True,
-            "ftol": 1e-9,
-            "eps": 10,
-        }
-
+        opt_options = {"maxiter": 100, "disp": True, "iprint": 2, "ftol": 1e-8, "eps": 5}
         # Set initial yaws
         yws = (yaw_ini,) * xs.size
-        # Set min-max boundary constraints
-        bnds = ((0, opt_xbound * D),) * xs.size + ((0, opt_ybound * D),) * xs.size
+        # Set min-max boundary constraints (+1D to match FLORIS bnds)
+        bnds = ((0, opt_xbound*D),)*xs.size + ((0, opt_ybound*D),)*xs.size
 
         # Optimise and time
         t0 = time.time()
@@ -407,16 +361,13 @@ def neuralOptimiser(
             method="SLSQP",
             bounds=bnds,
             options=opt_options,
-            constraints=tmp1,
+            constraints=con,
         )
         t1 = time.time()
 
         neural_time = round(t1 - t0, 2)
 
-        # optimal, floris_power_gain = superposition(res.x, u_stream=ws, tis=ti, xs=xs, ys=ys,
-        #                                            cp=cp, wind_speed=wind_speed, plots=plots,
-        #                                            power_opt=True, floris_gain=floris_gain)
-        optimal, floris_power_opt = superposition(
+        optimal, floris_power_opt, floris_power_0 = superposition(
             res.x,
             yws,
             u_stream=ws,
@@ -430,22 +381,17 @@ def neuralOptimiser(
             x0=x0,
         )
 
-        if plots == True:
-            # print(res)
-            print("|-----------------------|")
-            print("Neural Initial Power", round(power_ini / 1e6, 2), "MW")
-            print("Neural Optimal Power", round(-optimal / 1e6, 2), "MW")
-            print(
-                "Neural Power Gain (%)",
-                round((np.abs(optimal) - power_ini) / power_ini * 100, 2),
-            )
-            print("|-----------------------|")
+        if results == True:
+            print("-----------------------------------------------------")
+            print("Floris Initial Power", round(floris_power_0, 2), "MW")
+            print("Floris Optimal Power", round(floris_power_opt, 2), "MW")
+            print("Floris Power Gain (%)", round((np.abs(floris_power_opt) - floris_power_0)/floris_power_0 * 100, 2))
             print("Neural Layout:", np.round(res.x, 2))
-
-        print("NEURAL TIME: ", neural_time)
+            print("-----------------------------------------------------")
+        print("NEURAL TIME:", neural_time)
 
         # return floris_power_gain, neural_time
-        return floris_power_opt, neural_time
+        return floris_power_opt, neural_time, floris_power_0
 
 
 def compare(
@@ -459,6 +405,7 @@ def compare(
     timings=False,
     power_opt=True,
     single=False,
+    saveas=None,
 ):
     """
     Performs a comparison between a wind farm produced
@@ -475,22 +422,15 @@ def compare(
 
     """
 
-    f = open(
-        file_path,
-    )
+    f = open(file_path,)
     data = json.load(f)
     f.close()
 
     layout = np.concatenate((xs, ys), axis=0)
-
     cp = np.array(data["turbine"]["properties"]["power_thrust_table"]["power"])
     wind_speed = np.array(
         data["turbine"]["properties"]["power_thrust_table"]["wind_speed"]
     )
-
-    # power_ini = superposition([-0, 0, -0], u_stream = ws, tis=ti, cp=cp,
-    #                           wind_speed=wind_speed, plots=False, power_opt=True)
-    # print('Initial Power', round(power_ini/1e6, 2), 'MW')
 
     return superposition(
         yws,
@@ -505,10 +445,11 @@ def compare(
         timings=timings,
         floris_gain=True,
         single=single,
+        saveas=saveas,
     )
 
 
-def heatmap(xs, ys, res=10, farm_opt=False):
+def heatmap(xs, ys, res=10, farm_opt=False, saveas=None):
     """
     Assess the performance of the DNN vs FLORIS on
     parametric optimiser calls for a wide range of
@@ -525,15 +466,9 @@ def heatmap(xs, ys, res=10, farm_opt=False):
     # Wind speeds and turbulence intensities examined
     x_ws = np.linspace(ws_range[0], ws_range[1], res)
     y_ti = np.linspace(ti_range[0], ti_range[1], res)
-
-    # s = 1e-9
-    # yy = 2**( 1/(x_ws+s)/6 ) - 0.9
-    # rs_min = []; rs_max = []
-    # for _ in range(res):
-    #     rs_min.append(-0.01+0*0.02)
-    #     rs_max.append(-0.01+1*0.02)
-    # ti_min = 2**( 1/(x_ws+s)/6 ) - 0.9 + rs_min*(1 + 60*(yy-0.1))
-    # ti_max = 2**( 1/(x_ws+s)/6 ) - 0.9 + rs_max*(1 + 60*(yy-0.1))
+    if res == 3:
+        x_ws = np.array([11, 12.33333333, 13.66666667])
+        y_ti = np.array([0.01, 0.03111111, 0.05222222])
 
     # Initialisation of power and timing heatmaps
     g0 = np.zeros((res, res))
@@ -542,21 +477,29 @@ def heatmap(xs, ys, res=10, farm_opt=False):
     t1 = np.zeros((res, res))
     t2 = np.zeros((res, res))
 
+    only_ddn = False
+    cnt = 0
     # Begin parametric runs
     for k1 in range(res):
 
-        # Print progress
-        print(round(k1 / res * 100, 2), "%", "complete.")
-
         for k2 in range(res):
 
-            # if y_ti[k2] > ti_min[k1] and y_ti[k2] < ti_max[k1]:
-            #     continue
+            # Print progress
+            print()
+            print('OPTIMISATION PROGRESS:', int(cnt/res/res*100), "%", "COMPLETE.")
+            print()
+            cnt+=1
+
             if farm_opt == True:
-                g1[k1, k2], t1[k1, k2], g0[k1, k2] = florisOptimiser(
-                    ws=x_ws[k1], ti=y_ti[k2], layout_x=xs, layout_y=ys, mode="farm"
-                )
-                g2[k1, k2], t2[k1, k2] = neuralOptimiser(
+                if only_ddn == False:
+                    g1[k1, k2], t1[k1, k2], g0[k1, k2] = florisOptimiser(
+                        ws=x_ws[k1], 
+                        ti=y_ti[k2],
+                        layout_x=xs, 
+                        layout_y=ys,
+                        mode="farm"
+                    )
+                g2[k1, k2], t2[k1, k2], g0[k1, k2] = neuralOptimiser(
                     ws=x_ws[k1],
                     ti=y_ti[k2],
                     xs=xs,
@@ -565,35 +508,58 @@ def heatmap(xs, ys, res=10, farm_opt=False):
                     mode="farm",
                 )
             else:
-                g1[k1, k2], t1[k1, k2], g0[k1, k2] = florisOptimiser(
-                    ws=x_ws[k1], ti=y_ti[k2], layout_x=xs, layout_y=ys
+                if only_ddn == False:
+                    g1[k1, k2], t1[k1, k2], g0[k1, k2] = florisOptimiser(
+                        ws=x_ws[k1],
+                        ti=y_ti[k2],
+                        layout_x=xs,
+                        layout_y=ys
+                    )
+                g2[k1, k2], t2[k1, k2], g0[k1, k2]= neuralOptimiser(
+                    ws=x_ws[k1],
+                    ti=y_ti[k2],
+                    xs=xs, ys=ys,
+                    floris_gain=True
                 )
-                g2[k1, k2], t2[k1, k2] = neuralOptimiser(
-                    ws=x_ws[k1], ti=y_ti[k2], xs=xs, ys=ys, floris_gain=True
-                )
+
+    if saveas != None:
+        save1 = saveas+"floris_opt"; save2=saveas+"ddn_opt"; save3=saveas+"floris_t"; save4=saveas+"ddn_t"
+    else:
+        save1, save2, save3, save4 = saveas, saveas, saveas, saveas
 
     # Calculate FLORIS power gain in MW
     sample = g1 - g0
-    makeHeatmap(
-        np.transpose(np.flip(sample, 1)), x_ws, y_ti, title="Floris optimisation"
+    mv = makeHeatmap(
+        np.transpose(np.flip(sample, 1)), x_ws, y_ti, title="Floris optimisation", saveas=save1
     )
-    # Calculate FLORIS power gain in MW
+    if only_ddn == True:
+        # mval = None
+        mval = 2.1
+    else:
+        mval = mv
+    # Calculate DNN power gain in MW
     sample = g2 - g0
     makeHeatmap(
-        np.transpose(np.flip(sample, 1)), x_ws, y_ti, title="Neural optimisation"
+        np.transpose(np.flip(sample, 1)), x_ws, y_ti, mval, title="Neural optimisation", saveas=save2
     )
-
     # Calculate FLORIS average time
     sample = t1
     print("Average FLORIS time:", np.round(np.mean(t1), 2))
-    makeHeatmap(np.transpose(np.flip(sample, 1)), x_ws, y_ti, title="Floris time")
+    mv = makeHeatmap(np.transpose(np.flip(sample, 1)), x_ws, y_ti, title="Floris time", saveas=save3
+    )
+    if only_ddn == True:
+        # mval = None
+        mval = 1700
+    else:
+        mval = mv
     # Calculate DNN average time
     sample = t2
     print("Average DNN time:", np.round(np.mean(t2), 2))
-    makeHeatmap(np.transpose(np.flip(sample, 1)), x_ws, y_ti, title="Neural time")
+    makeHeatmap(np.transpose(np.flip(sample, 1)), x_ws, y_ti, mval, title="Neural time", saveas=save4
+    )
 
 
-def makeHeatmap(bitmap, x_ws, y_ti, vmax=None, title=None):
+def makeHeatmap(bitmap, x_ws, y_ti, vmax=None, title=None, saveas=None):
     """
     Plots bitmap of parametric optimisation runs.
 
@@ -615,14 +581,21 @@ def makeHeatmap(bitmap, x_ws, y_ti, vmax=None, title=None):
     maxval = np.max(np.abs([bitmap.min(), bitmap.max()]))
     if vmax:
         maxval = vmax
+    vmin = -maxval
+
+    if title == "Floris time" or title == "Neural time":
+        cmap = "RdYlGn_r"
+        vmin = 0
+    else:
+        cmap = "RdYlGn"
 
     # Plot heatmap based on bitmap produced by the "Assess" function.
     plt.figure()
     plt.imshow(
         bitmap,
-        cmap="RdYlGn",
+        cmap=cmap,
         interpolation="nearest",
-        vmin=-maxval,
+        vmin=vmin,
         vmax=maxval,
         extent=[x_min, x_max, y_min, y_max],
         aspect=(x_max - x_min) / (y_max - y_min),
@@ -633,10 +606,15 @@ def makeHeatmap(bitmap, x_ws, y_ti, vmax=None, title=None):
     plt.ylabel("Turbulence intensity", fontname="serif")
 
     plt.colorbar()
-    plt.show()
+    if saveas != None:
+        plt.savefig("figures/"+str(saveas), dpi=1200)
+    else:
+        plt.show()
+
+    return maxval
 
 
-def yawVsPowerContour(ws, ti, xs, ys, res=30):
+def yawVsPowerContour(yws, ws, ti, xs, ys, res=30, saveas=None):
     """
     Plot 2 turbine wind farm yaw-power contour
     """
@@ -650,13 +628,13 @@ def yawVsPowerContour(ws, ti, xs, ys, res=30):
 
     powerNeural = np.zeros((res, res))
     powerFloris = np.zeros((res, res))
-
+    cnt = 0
     for i in range(res):
         for j in range(res):
 
-            if yws.size == 2:
+            if len(yws) == 2:
                 yws = [i, j]
-            elif yws.size == 3:
+            elif len(yws) == 3:
                 yws = [0, i, j]
 
             r = compare(
@@ -676,17 +654,26 @@ def yawVsPowerContour(ws, ti, xs, ys, res=30):
     fig = plt.figure(1)
     ax = plt.axes(projection="3d")
     ax.contour3D(X, Y, powerNeural, 50, cmap="viridis")
-    ax.set_xlabel("yaw2")
-    ax.set_ylabel("yaw1")
-    ax.set_zlabel("power")
+    # ax.plot_surface(X, Y, powerNeural, rstride=1, cstride=1, cmap='viridis', edgecolor='none')
+    ax.set_xlabel("Yaw b")
+    ax.set_ylabel("Yaw a")
+    ax.set_zlabel("Power (MW)")
     ax.set_title("Neural")
+
+    if saveas != None:
+        fig.savefig("figures/"+str(saveas)+"yvpd", dpi=1200)
+    else:
+        plt.show()
 
     fig = plt.figure(2)
     ax = plt.axes(projection="3d")
     ax.contour3D(X, Y, powerFloris, 50, cmap="viridis")
-    ax.set_xlabel("yaw2")
-    ax.set_ylabel("yaw1")
-    ax.set_zlabel("power")
-    ax.set_title("Floris")
+    ax.set_xlabel("Yaw b")
+    ax.set_ylabel("Yaw a")
+    ax.set_zlabel("Power (MW)")
+    ax.set_title("FLORIS")
 
-    plt.show()
+    if saveas != None:
+        fig.savefig("figures/"+str(saveas)+"yvpf", dpi=1200)
+    else:
+        plt.show()

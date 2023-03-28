@@ -80,6 +80,7 @@ def create(plots=False):
 
     print("Max inlet speed:", round(np.max(speeds), 2), "m/s")
 
+
     speeds_out = np.zeros((data_size, out_piece, rows))
     u_rs = np.zeros((out_piece, rows))
 
@@ -88,16 +89,18 @@ def create(plots=False):
     sample_size = 9  # must be perfect square for sample plots
 
     if save_data == True:
-        os.system("mkdir " + "wake_dataset")
+        print("Are you sure you want to create new dataset? (y/n)")
+        if input() == "y":
+            os.system("mkdir " + "wake_dataset")
+            np.save("wake_dataset/inlets.npy", np.stack((speeds, ti, yw), axis = 1))
+    elif curl == True:
+        inlets = np.load("wake_dataset/inlets.npy")
+        speeds, ti, yw = inlets[:data_size, 0], inlets[:data_size, 1], inlets[:data_size, 2]
 
     for i in range(data_size):
 
         if curl == True:
             fi.floris.farm.set_wake_model("curl")
-            # Curl dataset tests
-            # print('inputs', speeds[i], ti[i], yw[i])
-            # speeds[i], ti[i], yw[i] = 4.163060513269969, 0.12374511199743694, 10.081380891388163
-            # speeds[i], ti[i], yw[i] = 3, 0.2, 35
 
         if make_data == True:
 
@@ -105,22 +108,19 @@ def create(plots=False):
                 print("Synthesizing data...")
 
             if i % 100 == 0:
-                print("Synthesised ", int(i / data_size * 100), "%", "of wakes.")
+                print("Synthesised", int(i / data_size * 100), "%", "of wakes.")
 
             if inputs == 1:
                 fi.reinitialize_flow_field(wind_speed=speeds[i])
                 fi.calculate_wake()
-
             if inputs == 2:
                 fi.reinitialize_flow_field(wind_speed=speeds[i])
                 fi.reinitialize_flow_field(turbulence_intensity=ti[i])
                 fi.calculate_wake()
-
             if inputs == 3:
                 fi.reinitialize_flow_field(wind_speed=speeds[i])
                 fi.reinitialize_flow_field(turbulence_intensity=ti[i])
                 fi.calculate_wake(yaw_angles=yw[i])
-
             if inputs == 4:
                 fi.reinitialize_flow_field(wind_speed=speeds[i])
                 fi.reinitialize_flow_field(turbulence_intensity=ti[i])
@@ -140,17 +140,16 @@ def create(plots=False):
                     x_bounds=x_bounds,
                     y_bounds=y_bounds,
                 )
-                # cut_plane = fi.get_hor_plane()
+
             u_mesh = cut_plane.df.u.values.reshape(
                 cut_plane.resolution[1], cut_plane.resolution[0]
             )
 
-            # plt.imshow(u_mesh, extent=[0, 3780, -252, 252])
-            # # wfct.visualization.visualize_cut_plane(cut_plane)
-            # plt.show()
-
         if save_data == True:
+
+            # Save velocities as numpy array
             np.save("wake_dataset/" + "wake" + str(i), u_mesh)
+
             continue
 
         if save_data == False and curl == True:
@@ -163,9 +162,6 @@ def create(plots=False):
 
             # Read back into different array "r"
             u_mesh = np.load("wake_dataset/" + "wake" + str(i) + ".npy")
-
-        # plt.imshow(u_mesh, extent=[0, 3780, -252, 252])
-        # plt.show()
 
         if row_major == 0:
             u_mesh = u_mesh.T
@@ -200,7 +196,6 @@ def create(plots=False):
         # Plot synthesized data (batches of sample_size)
         if plots == True and np.mod(i + 1, sample_size) == 0:
 
-            sizeOfFont = 11
             fig, axarr = plt.subplots(
                 int(np.sqrt(sample_size)),
                 int(np.sqrt(sample_size)),
@@ -230,26 +225,14 @@ def create(plots=False):
                 wfct.visualization.visualize_cut_plane(
                     hor_plane, ax=ax, minSpeed=minspeed, maxSpeed=maxspeed
                 )
-                ax.set_title(title, fontname="serif", fontsize=sizeOfFont)
+                ax.set_title(title)
 
-                fontProperties = {
-                    "family": "serif",
-                    "weight": "normal",
-                    "size": sizeOfFont,
-                }
-
-                ax.set_yticklabels(ax.get_yticks().astype(int), fontProperties)
-                ax.set_xticklabels(ax.get_xticks().astype(int), fontProperties)
+                ax.set_yticklabels(ax.get_yticks().astype(int))
+                ax.set_xticklabels(ax.get_xticks().astype(int))
 
             plt.show()
             sample_plots = []
             cnt += 1
-
-    # # Standardisation
-    # yw = normalise(yw, norm)
-    # ti = normalise(ti, norm)
-    # speeds = normalise(speeds, norm)
-    # hbs = normalise(hbs, norm)
 
     # Normalisation
     speeds = ((speeds - ws_range[0]) / (ws_range[1] - ws_range[0]) - 0.5) * 3
@@ -297,7 +280,30 @@ def create(plots=False):
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def training(ii, X_train, X_val, X_test, y_train, y_val, y_test, model):
+def dif_central(u, dx, eflag=0):
+
+    batches = u.shape[0]
+    u_x = torch.ones_like(u)
+
+    for ii in range(batches):
+        for jj in range(1, dimx-1):
+            u_x[ii, :, jj] = (u[ii, :, jj+1] - u[ii, :, jj-1])/(2*dx)
+        u_x[ii, :, 0] = (u[ii, :, 1] - u[ii, :, 0])/dx
+        u_x[ii, :, -1] = (u[ii, :, -2] - u[ii, :, -1])/dx
+    
+    if eflag==-1:
+        u_x[:,:,:10] = 0
+        plt.figure(1)
+        plt.imshow(u[0].detach().cpu().numpy())
+        plt.figure(2)
+        plt.imshow(u_x[0].detach().cpu().numpy())
+        plt.show()
+
+    return u_x
+
+
+def training(X_train, X_val, X_test, y_train, y_val, y_test, model, plot_curves=0,
+            multiplots=False, data_size=data_size, batch_size=batch_size, saveas=None):
     """
     Trains the neural model.
 
@@ -305,157 +311,154 @@ def training(ii, X_train, X_val, X_test, y_train, y_val, y_test, model):
         plots (boolean, optional) Plots indicative sample.
     """
 
-    # Define validation and test batch sizes
-    val_batch_size = y_val.size()[1]
-    # test_batch_size = y_test.size()[1]
+    if batch_size > X_train.shape[0]:
+        print('Error: batch_size must be <', X_train.shape[0])
+        exit()
 
-    train_split = TensorDataset(X_train, y_train[:, :, ii])
-    validation_split = TensorDataset(X_val, y_val[:, :, ii])
+    # Define validation and test batch sizes
+    val_batch_size = y_val.size()[0]
+    train_split = TensorDataset(X_train, y_train[:, :, -1])
+    validation_split = TensorDataset(X_val, y_val[:, :, -1])
     train_loader = DataLoader(
-        train_split, batch_size=batch_size, shuffle=True, num_workers=workers
+        train_split, batch_size=batch_size, shuffle=True, num_workers=workers, drop_last=True
     )
     validation_loader = DataLoader(
-        validation_split, batch_size=val_batch_size, shuffle=True, num_workers=workers
+        validation_split, batch_size=val_batch_size, shuffle=True, num_workers=workers, drop_last=True
     )
 
     #  Seed, optimiser and criterion
     set_seed(42)
-
-    # Parameters to optimize
-
-    # 2 layers
-    params = (
-        list(model.fc1[ii].parameters())
-        + list(model.fc2[ii].parameters())
-        + list(model.fc3[ii].parameters())
-    )
-
-    # # 3 layers
-    # params = list(model.fc1[ii].parameters()) + \
-    #          list(model.fc2[ii].parameters()) + \
-    #          list(model.fc2_[ii].parameters()) + \
-    #          list(model.fc3[ii].parameters())
-
+    params = list(model.fc1.parameters()) + \
+             list(model.fc2.parameters()) + \
+             list(model.fc3.parameters())
     # Optimizers
     if opt_method == "SGD":
-        optimizer = optim.SGD(
-            params, lr=lr, momentum=momentum
-        )  # , weight_decay=weight_decay)
+        optimizer = optim.SGD(params, lr=lr, momentum=momentum)
     elif opt_method == "Rprop":
         optimizer = optim.Rprop(params, lr=lr, etas=(0.5, 1.2), step_sizes=(1e-06, 50))
-
+    elif opt_method == "Adam":
+        optimizer = optim.Adam(params, lr=lr)
     # Loss criterions
-    criterion = nn.MSELoss()
-    # criterion = nn.L1Loss()
-    # criterion = nn.AbsCriterion()
+    criterion = nn.MSELoss(size_average=1)
     criterion = criterion.to(device)
 
-    val_plot = []
-    train_plot = []
-    val_loss_plot = []
-    train_loss_plot = []
+    # Initialise plots
+    t_plot = []; v_plot = []
+    t_loss_plot = []; v_loss_plot = []
+    lossmin = 1e16; valmax = 0.5
 
     # Model Training
     for i_epoch in range(epochs):
 
         print("Epoch:", i_epoch, "/", epochs)
-
-        val_loss = 0
-        val_acc = 0
-        train_loss = 0
-        train_acc = 0
-        train_loss2 = 0
-        val_min = 0
+        t_loss = 0; t_lossc1 = 0; t_lossc1_ = 0; t_lossc2 = 0; t_acc = 0
+        v_loss = 0; v_acc = 0; v_lossc1_ = 0; v_min = 0;
 
         model.train().to(device)
+        eflag = i_epoch
         for X, y in train_loader:
+            # Get yt_pred
             X, y = X.to(device), y.to(device)
+            yt_pred = model(X)
+            c1 = criterion(yt_pred, y)
+            yy = yt_pred.detach().cpu().numpy()
+            yy_ = y.detach().cpu().numpy()
+            c2 = torch.tensor(0)
 
-            yt_pred = model(X, ii)
-
-            train_loss = criterion(yt_pred, y)
-            train_loss2 += torch.sum(torch.pow(y - yt_pred, 2)).detach().cpu().numpy()
-            train_acc += (
-                torch.sum(1 - torch.abs(y - yt_pred) / yt_pred).detach().cpu().numpy()
-            )
+            # Losses
+            train_loss = c1 + c2
+            t_loss += train_loss.item()
+            tterm = torch.abs(y - yt_pred)/torch.max(y)
+            t_acc += torch.sum(torch.pow(tterm, 2)).detach().cpu().numpy()
+            t_lossc1 += c1.item()
+            t_lossc1_ += torch.sum(torch.pow(y - yt_pred, 2)).detach().cpu().numpy()
+            t_lossc2 += c2.item()
 
             optimizer.zero_grad()
             train_loss.backward()
             optimizer.step()
+            eflag = 0
 
-        model.eval()
+        # Training results
+        t_loss = t_loss/(train_slice*data_size/batch_size)
+        t_lossc1 = t_lossc1/(train_slice*data_size/batch_size)
+        t_lossc1_ /= train_slice*data_size*out_piece
+        t_lossc2 = t_lossc2/(train_slice*data_size/batch_size)
+        t_acc /= train_slice*data_size*out_piece
+        t_acc = 1 - np.sqrt(t_acc)
+
+        model.eval().to(device)
         for X, y in validation_loader:
             with torch.no_grad():
+
+                val_batch = y.shape[0]
                 X, y = X.to(device), y.to(device)
-                y_pred = model(X, ii)
+                y_pred = model(X)
+                c1 = criterion(y_pred, y)
+                c2 = torch.tensor(0)
 
-                val_loss += torch.sum(torch.pow(y - y_pred, 2)).detach().cpu().numpy()
-                val_acc += (
-                    torch.sum(1 - torch.abs(y - y_pred) / y_pred).detach().cpu().numpy()
-                )
-                val_min += torch.min(1 - torch.abs(y - y_pred)).detach().cpu().numpy()
+                val_loss = c1 + c2
+                v_loss += val_loss.item()
+                vvterm = torch.abs(y - y_pred)/torch.max(y)
+                v_acc += torch.sum(torch.pow(vvterm, 2)).detach().cpu().numpy()
+                v_min += torch.min(1 - torch.abs(y - y_pred)).detach().cpu().numpy()
+                v_lossc1_ += torch.sum(torch.pow(y - y_pred, 2)).detach().cpu().numpy()
 
-        train_loss2 /= train_slice * data_size * out_piece
-        train_acc /= train_slice * data_size * out_piece
-        val_loss /= val_slice * data_size * out_piece
-        val_acc /= val_slice * data_size * out_piece
-        val_min /= val_slice * data_size * out_piece
+        # # Validation results
+        v_loss = v_loss/(val_batch_size/val_batch)
+        v_lossc1_ /= val_batch_size*out_piece
+        v_acc /= val_batch_size*out_piece
+        v_acc = 1 - np.sqrt(v_acc)
+        v_min /= val_batch_size*out_piece
 
-        # val_plot.append(val_min)
-        val_plot.append(val_acc)
-        train_plot.append(train_acc)
-        train_loss_plot.append(train_loss2)
-        val_loss_plot.append(val_loss)
+        # Append to plots
+        t_plot.append(t_acc); v_plot.append(v_acc)
+        t_loss_plot.append(t_loss); v_loss_plot.append(v_loss)
 
-        # mean sum squared loss
+        if v_loss < lossmin: # and i_epoch > epochs*0.8:
+            lossmin = v_loss
+            # Save model weights
+            torch.save(model.state_dict(), weights_path)
+            print("Saved weights with", v_loss, "loss")
+        if v_acc > valmax: # and i_epoch > epochs*0.8:
+            valmax = v_acc
+
+        # Mean sum squared loss
         print(
-            "Val Loss: "
-            + str(round(val_loss, 4))
-            + " Val Acc: "
-            + str(round(val_acc, 4))
+              "t_acc: " + str(round(t_acc, 4)) + " v_acc: " + str(round(v_acc, 4))
+            + " t_loss: " + str(round(t_loss, 2)) +  " v_loss: " + str(round(v_loss, 2))
+            + " t_lossc1: " + str(round(t_lossc1, 2)) + " t_lossc2: " + str(round(t_lossc2, 2))
         )
 
     # ------------- Loss and Accuracy Plots -------------#
-    if plot_curves == 1:
-
-        val_plot = np.array(val_plot)
-        train_plot = np.array(train_plot)
-        val_plot[val_plot < 0] = 0
-        train_plot[train_plot < 0] = 0
-        val_plot[val_plot > 1] = 1
-        train_plot[train_plot > 1] = 1
+    if plot_curves == 1 or saveas != None:
 
         fig, axs = plt.subplots(1, 2)
         del fig
 
-        fontProperties = {"family": "serif", "weight": "normal", "size": 11}
+        axs[0].plot(np.arange(epochs), t_loss_plot, color="navy", linestyle="--")
+        axs[0].plot(np.arange(epochs), v_loss_plot, color="crimson")
+        axs[1].plot(np.arange(epochs), t_plot, color="navy", linestyle="--")
+        axs[1].plot(np.arange(epochs), v_plot, color="crimson")
+        axs[1].set_ylim(0.5, 1)
 
-        axs[0].plot(np.arange(epochs), val_loss_plot, color="crimson")
-        axs[0].plot(np.arange(epochs), train_loss_plot, color="navy", linestyle="--")
-        axs[1].plot(np.arange(epochs), val_plot, color="crimson")
-        axs[1].plot(np.arange(epochs), train_plot, color="navy", linestyle="--")
-
-        print("Validation loss:", val_loss_plot[-1])
-        print("Train loss:", train_loss_plot[-1])
-        print("Validation accuracy:", val_plot[-1])
-        print("Train accuracy:", train_plot[-1])
+        print("Validation loss:", lossmin)
+        print("Validation accuracy:", valmax)
 
         axs[0].tick_params(axis="x", direction="in")
         axs[0].tick_params(axis="y", direction="in")
         axs[0].set_aspect(aspect=1.0 / axs[0].get_data_ratio())
-        # axs[0].xlim(left = 0)
         axs[1].tick_params(axis="x", direction="in")
         axs[1].tick_params(axis="y", direction="in")
         axs[1].set_aspect(aspect=1.0 / axs[1].get_data_ratio())
-        # axs[1].xlim(left = 0)
-        axs[0].set_xticklabels(axs[0].get_xticks().astype(int), fontProperties)
-        axs[0].set_yticklabels(axs[0].get_yticks().astype(int), fontProperties)
-        axs[1].set_xticklabels(axs[1].get_xticks().astype(int), fontProperties)
-        axs[1].set_yticklabels(np.round(axs[1].get_yticks(), 2), fontProperties)
 
-        plt.show()
+        if saveas != None:
+            plt.savefig("figures/"+str(saveas), dpi=1200)
+        elif multiplots == False:
+            plt.show()
 
-    if parallel == False:
-        print(round(ii / rows * 100, 2), "%")
+    # Replace last values with best values
+    v_loss_plot[-1] = lossmin
+    v_plot[-1] = valmax
 
-    return 0
+    return v_loss_plot, t_loss_plot, v_plot, t_plot

@@ -2,14 +2,18 @@ import numpy as np
 from packages import json
 from packages import torch
 import floris.tools as wfct
+from floris.tools import static_class as sc
 
-#                                      Initialisations                                            #
+
+#                              Initialisation of variables                                         #
 # =================================================================================================#
 
-# Open JSON file
+# Open JSON file (change based on the wake model)
 neural_info = open(
-    "inputs.json",
+    "inputs_gauss.json",
 )
+
+
 # returns JSON object as a dictionary
 data = json.load(neural_info)
 # Close JSON file
@@ -23,11 +27,13 @@ file_path = data["turbine"]["file_path"]
 train_net = data["data"]["train_net"]
 make_data = data["data"]["make_data"]
 save_data = data["data"]["save_data"]
+local_ti = data["data"]["local_ti"]
+local_pw = data["data"]["local_pw"]
 curl = data["data"]["curl"]
 weather = data["data"]["weather"]
 row_major = data["data"]["row_major"]
-x_bnds = data["data"]["x_bnds"]
-y_bnds = data["data"]["y_bnds"]
+x_bounds = data["data"]["x_bounds"]
+y_bounds = data["data"]["y_bounds"]
 data_size = data["data"]["data_size"]
 batch_size = data["data"]["batch_size"]
 dimx = data["data"]["dimx"]
@@ -49,7 +55,11 @@ yw_range = data["data_range"]["yw_range"]
 hb_range = data["data_range"]["hb_range"]
 
 # Training hyperparameters
-device = data["training"]["device"]
+# device = data["training"]["device"]
+if train_net == True:
+    device = "cuda"
+else:
+    device = "cpu"
 parallel = data["training"]["parallel"]
 para_workers = data["training"]["para_workers"]
 seed = data["training"]["seed"]
@@ -68,6 +78,7 @@ opt_method = data["training"]["opt_method"]
 weights_path = data["results"]["weights_path"]
 fltr = data["results"]["fltr"]
 denoise = data["results"]["denoise"]
+contours_on = data["results"]["contours_on"]
 
 # Optimisation boundaries
 opt_xbound = data["optimisation"]["opt_xbound"]
@@ -99,8 +110,11 @@ wind_speed = np.array(
 )
 
 # Read turbine json
+sc.x_bounds = x_bounds
+sc.y_bounds = y_bounds
 fi = wfct.floris_interface.FlorisInterface(file_path)
 D = fi.floris.farm.turbines[0].rotor_diameter  # turbine rotor diameter
+D = float(D)
 
 
 # Define the size of the partition. if full_domain==Flase, defaults at row or column size.
@@ -133,5 +147,5 @@ if defo == 1:
     x_bounds = None
     y_bounds = None
 else:
-    x_bounds = (x_bnds[0], x_bnds[1])
-    y_bounds = (y_bnds[0], y_bnds[1])
+    x_bounds = (x_bounds[0], x_bounds[1])
+    y_bounds = (y_bounds[0], y_bounds[1])

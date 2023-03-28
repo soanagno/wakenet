@@ -21,6 +21,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import dask
 from dask.distributed import Client, progress
 
+from PIL import Image
 from scipy import interp
 from scipy import ndimage
 from scipy import interpolate
