@@ -1,7 +1,5 @@
 # WakeNet: Deep Neural Networks for wind farm wake modelling and optimisation
 
-* The code will be made available after the results are published.
-
 ## Abstract
 
 <p align="justify">
